@@ -1,0 +1,4 @@
+(test
+ (name minicaml)
+ (preprocess
+  (pps ppx_inline_test)))
