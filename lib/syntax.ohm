@@ -1,0 +1,121 @@
+// https://ohmlang.github.io/editor/
+MiniCaml {
+  MAIN = Exp eof
+
+  Exp =
+    | Prefix
+    // fun x -> e
+    | fun var arrow Exp                -- fun
+    // let x = e1 in e2
+    | let var equal Exp in Exp         -- let
+    // let rec f x = e1 in e2
+    | let rec var var equal Exp in Exp -- let_rec
+    | if Exp then Exp else Exp         -- if
+    | match Exp with Cases             -- match
+
+  Prefix =
+    | Infix0
+
+  Infix0 =
+    | Infix1 (infix0op Infix1)*
+
+  Infix1 =
+    | Infix2 (infix1opR Infix1)* // right assoc
+
+  Infix2 =
+    | Infix3 (infix2op  Infix3)*
+
+  Infix3 =
+    | Infix4 (infix3op Infix4)*
+
+  Infix4 =
+    | PriExp PriExp+ -- apply
+    | PriExp
+
+  PriExp =
+    | var
+    | int
+    | bool
+    | lparen Exp rparen -- paren
+
+  Cases =
+    | Pattern arrow Exp         -- single
+    | (vbar Pattern arrow Exp)+ -- multiple
+
+  Pattern =
+    | Pattern_inner (colcol Pattern)*
+
+  Pattern_inner =
+    | var
+    | int
+    | bool
+    | empty_list
+
+  /// tokens
+
+  // literal
+  var = ~keyword (letter | "_") ( alnum | "_" | "'")*
+  int = minus? digit+
+
+  // op
+  
+  infix0op  = equal | less | greater
+  infix1opR = colcol
+  infix2op  = plus | minus
+  infix3op  = asterisk | slash
+
+  plus     = "+"
+  minus    = "-"
+  asterisk = "*"
+  slash    = "/"
+  equal    = "="
+  less     = "<"
+  greater  = ">"
+  semicol  = ";"
+  colcol   = "::"
+
+  // group
+  
+  empty_list = lbra rbra
+  
+  lparen = "("
+  rparen = ")"
+  lbra   = "["
+  rbra   = "]"
+
+  // termination
+  arrow = "->"
+  vbar  = "|"
+
+  // keyword
+  keyword =
+    | true
+    | false
+    | fun
+    | let
+    | rec
+    | in
+    | if
+    | then
+    | else
+    | match
+    | with
+    
+
+  bool = true | false
+
+  true  = "true"
+  false = "false"
+  fun   = "fun"
+  let   = "let"
+  rec   = "rec"
+  in    = "in"
+  if    = "if"
+  then  = "then"
+  else  = "else"
+  match = "match"
+  with  = "with"
+
+  // control
+  eof = end
+}
