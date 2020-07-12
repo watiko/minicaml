@@ -1,5 +1,6 @@
 (library
  (inline_tests)
  (name minicaml)
+ (libraries fmt)
  (preprocess
   (pps ppx_inline_test)))
