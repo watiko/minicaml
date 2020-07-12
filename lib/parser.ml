@@ -126,6 +126,42 @@ let literalP =
 
 let exp prefix cases =
   fix (fun exp ->
+      let funP' =
+        let* _ = token funP in
+        let* x = token var in
+        let* _ = token arrow in
+        let* e = exp in
+        pure @@ Fun (x, e)
+      in
+      let letP' =
+        let* _ = token letP in
+        let* x = token var in
+        let* _ = token equal in
+        let* e1 = exp in
+        let* _ = token inP in
+        let* e2 = exp in
+        pure @@ Let (x, e1, e2)
+      in
+      let letRecP =
+        let* _ = token letP in
+        let* _ = token recP in
+        let* n = token var in
+        let* x = token var in
+        let* _ = token equal in
+        let* e1 = exp in
+        let* _ = token inP in
+        let* e2 = exp in
+        pure @@ LetRec (n, x, e1, e2)
+      in
+      let ifP' =
+        let* _ = token ifP in
+        let* ce = exp in
+        let* _ = token thenP in
+        let* e1 = exp in
+        let* _ = token elseP in
+        let* e2 = exp in
+        pure @@ If (ce, e1, e2)
+      in
       let matchP' =
         let* _ = token matchP in
         let* e = exp in
@@ -133,7 +169,7 @@ let exp prefix cases =
         let* cs = cases in
         pure @@ Match (e, cs)
       in
-      prefix <|> matchP')
+      prefix <|> funP' <|> letP' <|> letRecP <|> ifP' <|> matchP')
 ;;
 
 let prefix infix0 = infix0

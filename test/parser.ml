@@ -80,6 +80,25 @@ let test_list () =
   exp_test "simple" (Cons (i 1, Cons (i 2, Cons (i 3, Empty)))) "1 :: 2 :: 3 :: []"
 ;;
 
+let test_fn () =
+  let open Syntax in
+  exp_test "id" (Fun ("x", Var "x")) "fun x -> x"
+;;
+
+let test_let () =
+  let open Syntax in
+  exp_test "let_cmp" (Let ("x", IntLit 1, Eq (Var "x", IntLit 10))) "let x = 1 in x = 10";
+  exp_test
+    "let_rec"
+    (LetRec ("fn", "_", IntLit 1, Eq (App (Var "fn", IntLit 2), IntLit 10)))
+    "let rec fn _ = 1 in fn 2 = 10"
+;;
+
+let test_if () =
+  let open Syntax in
+  exp_test "simple" (If (BoolLit true, IntLit 1, IntLit 2)) "if true then 1 else 2"
+;;
+
 let () =
   Alcotest.run
     "Parser"
@@ -88,6 +107,8 @@ let () =
         ; Alcotest.test_case "pattern" `Quick test_pattern
         ; Alcotest.test_case "match" `Quick test_match
         ; Alcotest.test_case "math" `Quick test_math
+        ; Alcotest.test_case "fn" `Quick test_fn
+        ; Alcotest.test_case "if" `Quick test_if
         ] )
     ]
 ;;
