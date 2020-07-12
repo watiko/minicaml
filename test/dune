@@ -1,5 +1,5 @@
-(test
- (name test)
+(tests
+ (names eval)
  (libraries minicaml alcotest)
  (preprocess
   (pps ppx_inline_test)))
