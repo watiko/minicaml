@@ -1,7 +1,7 @@
 module Syntax = Minicaml.Syntax
 module Eval = Minicaml.Eval
 
-let value_testable = Alcotest.testable Eval.pprint_value ( = )
+let value_testable = Alcotest.testable Syntax.pprint_value ( = )
 
 let test_plus () =
   let open Syntax in

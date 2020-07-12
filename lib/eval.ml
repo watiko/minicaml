@@ -22,9 +22,5 @@ let rec eval e =
     | BoolVal true -> eval e1
     | BoolVal false -> eval e2
     | _ -> failwith "if: cond type is not bool")
-;;
-
-let pprint_value ppf = function
-  | IntVal n -> Fmt.pf ppf "IntVal(%d)" n
-  | BoolVal b -> Fmt.pf ppf "BoolVal(%b)" b
+  | _ -> failwith "not implemented"
 ;;
