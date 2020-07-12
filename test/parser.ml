@@ -3,6 +3,11 @@ module Syntax = Minicaml.Syntax
 
 let exp_testable = Alcotest.testable Syntax.pprint_exp ( = )
 
+let exp_test name expected input =
+  let open Parser in
+  Alcotest.(check (option exp_testable)) name (Some expected) (parse exp (explode input))
+;;
+
 let test_tokens () =
   let open Parser in
   let open Syntax in
@@ -50,15 +55,29 @@ let test_pattern () =
 ;;
 
 let test_match () =
-  let open Parser in
   let open Syntax in
-  let exp_test name expected input =
-    Alcotest.(check (option exp_testable))
-      name
-      (Some expected)
-      (parse exp (explode input))
-  in
   exp_test "" (Match (Var "x", [ IntLit 1, IntLit 100 ])) "match x with 1 -> 100"
+;;
+
+let test_math () =
+  let open Syntax in
+  let i n = IntLit n in
+  exp_test "plus" (Plus (i 1, i 2)) "1 + 2";
+  exp_test "plusplus" (Plus (Plus (i 1, i 2), i 3)) "1 + 2 + 3";
+  exp_test "timesdiv" (Div (Times (i 1, i 2), i 3)) "1 * 2 / 3";
+  exp_test "eq" (Eq (i 1, i 2)) "1 = 2";
+  exp_test
+    "complex_math"
+    (Div (Minus (Plus (i 1, Times (i 2, i 3)), i (-4)), i 10))
+    "(1 + 2 * 3 - (-4)) / 10"
+;;
+
+let test_list () =
+  let open Syntax in
+  let i n = IntLit n in
+  exp_test "empty" Empty "[]";
+  exp_test "simple" (Cons (i 1, Empty)) "1 :: []";
+  exp_test "simple" (Cons (i 1, Cons (i 2, Cons (i 3, Empty)))) "1 :: 2 :: 3 :: []"
 ;;
 
 let () =
@@ -68,6 +87,7 @@ let () =
       , [ Alcotest.test_case "tokens" `Quick test_tokens
         ; Alcotest.test_case "pattern" `Quick test_pattern
         ; Alcotest.test_case "match" `Quick test_match
+        ; Alcotest.test_case "math" `Quick test_math
         ] )
     ]
 ;;
