@@ -86,7 +86,7 @@ let int =
 
 let empty_list = lbra *> wss *> rbra *> pure Empty
 
-let pattern_inner =
+let literalP =
   (fun v -> Var v)
   <$> var
   <|> ((fun i -> IntLit i) <$> int)
@@ -94,7 +94,36 @@ let pattern_inner =
   <|> empty_list
 ;;
 
-let pattern =
+let exp priexp cases =
+  fix (fun exp ->
+      let priexp = priexp exp in
+      let matchP' =
+        let* _ = token matchP in
+        let* e = exp in
+        let* _ = token withP in
+        let* cs = cases in
+        pure @@ Match (e, cs)
+      in
+      matchP' <|> priexp)
+;;
+
+let priexp exp = literalP <|> (lparen *> exp <* rparen)
+
+let cases priexp pattern =
+  fix (fun cases ->
+      let exp = exp priexp cases in
+      let single_pair =
+        let* e1 = token pattern in
+        let* _ = token arrow in
+        let* e2 = token exp in
+        pure (e1, e2)
+      in
+      let single = List.cons <$> single_pair <*> pure [] in
+      let multiple = many1 (token vbar *> single_pair) in
+      single <|> multiple)
+;;
+
+let pattern pattern_inner =
   fix (fun pattern ->
       let* p = token pattern_inner in
       let* ps = many (token colcol *> pattern) in
@@ -105,3 +134,9 @@ let pattern =
         let r = Utils.fold_right1 (fun p acc -> Cons (p, acc)) ps in
         pure r)
 ;;
+
+let pattern_inner = literalP
+let pattern = pattern pattern_inner
+let cases = cases priexp pattern
+let exp = exp priexp cases
+let priexp = priexp exp
