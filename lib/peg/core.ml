@@ -41,9 +41,6 @@ let bind p f cs =
 let ( >>= ) = bind
 let ( let* ) = bind
 
-(* mplus *)
-let mzero _ = None
-
 (* alternative *)
 let either xp yp cs =
   match xp cs with
@@ -51,7 +48,11 @@ let either xp yp cs =
   | Some _ as x -> x
 ;;
 
+let empty _ = None
 let ( <|> ) = either
+
+(* mplus *)
+let mzero = empty
 
 (* === primitives === *)
 
@@ -81,6 +82,10 @@ let notP p cs =
   | None -> Some ((), cs)
   | Some _ -> None
 ;;
+
+(* derived *)
+
+let choice ps = List.fold_right ( <|> ) ps empty
 
 (* utils *)
 

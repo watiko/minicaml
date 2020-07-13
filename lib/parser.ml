@@ -117,11 +117,12 @@ let int =
 let empty_list = lbra *> wss *> rbra *> pure Empty
 
 let literalP =
-  (fun v -> Var v)
-  <$> var
-  <|> ((fun i -> IntLit i) <$> int)
-  <|> ((fun b -> BoolLit b) <$> bool)
-  <|> empty_list
+  choice
+    [ (fun v -> Var v) <$> var
+    ; (fun i -> IntLit i) <$> int
+    ; (fun b -> BoolLit b) <$> bool
+    ; empty_list
+    ]
 ;;
 
 let exp prefix cases =
@@ -169,7 +170,7 @@ let exp prefix cases =
         let* cs = token cases in
         pure @@ Match (e, cs)
       in
-      prefix <|> funP' <|> letP' <|> letRecP <|> ifP' <|> matchP')
+      choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ])
 ;;
 
 let prefix infix0 = infix0
