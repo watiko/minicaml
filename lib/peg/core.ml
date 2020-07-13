@@ -173,4 +173,4 @@ let%test "string" =
   Some ("abc", []) = p @@ explode "abc"
 ;;
 
-let token p = wss *> p <* wss
+let token p = p <* wss

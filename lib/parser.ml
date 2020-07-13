@@ -130,16 +130,16 @@ let exp prefix cases =
         let* _ = token funP in
         let* x = token var in
         let* _ = token arrow in
-        let* e = exp in
+        let* e = token exp in
         pure @@ Fun (x, e)
       in
       let letP' =
         let* _ = token letP in
         let* x = token var in
         let* _ = token equal in
-        let* e1 = exp in
+        let* e1 = token exp in
         let* _ = token inP in
-        let* e2 = exp in
+        let* e2 = token exp in
         pure @@ Let (x, e1, e2)
       in
       let letRecP =
@@ -148,25 +148,25 @@ let exp prefix cases =
         let* n = token var in
         let* x = token var in
         let* _ = token equal in
-        let* e1 = exp in
+        let* e1 = token exp in
         let* _ = token inP in
-        let* e2 = exp in
+        let* e2 = token exp in
         pure @@ LetRec (n, x, e1, e2)
       in
       let ifP' =
         let* _ = token ifP in
-        let* ce = exp in
+        let* ce = token exp in
         let* _ = token thenP in
-        let* e1 = exp in
+        let* e1 = token exp in
         let* _ = token elseP in
-        let* e2 = exp in
+        let* e2 = token exp in
         pure @@ If (ce, e1, e2)
       in
       let matchP' =
         let* _ = token matchP in
-        let* e = exp in
+        let* e = token exp in
         let* _ = token withP in
-        let* cs = cases in
+        let* cs = token cases in
         pure @@ Match (e, cs)
       in
       prefix <|> funP' <|> letP' <|> letRecP <|> ifP' <|> matchP')
@@ -183,7 +183,7 @@ let infix0 infix1 =
     | Token.Greater -> Greater (e1, e2)
   in
   let* e1 = token infix1 in
-  let* es = many (pair <$> token infix0op <*> infix1) in
+  let* es = many (pair <$> token infix0op <*> token infix1) in
   pure @@ List.fold_left f e1 es
 ;;
 
@@ -246,7 +246,7 @@ let exp_from priexp cases =
 let priexp cases =
   fix (fun priexp ->
       let exp = exp_from priexp cases in
-      literalP <|> (lparen *> exp <* rparen))
+      literalP <|> (lparen *> token exp <* rparen))
 ;;
 
 let cases pattern =
@@ -267,7 +267,7 @@ let cases pattern =
 let pattern pattern_inner =
   fix (fun pattern ->
       let* p = token pattern_inner in
-      let* ps = many (token colcol *> pattern) in
+      let* ps = many (token colcol *> token pattern) in
       match ps with
       | [] -> pure p
       | _ ->
@@ -290,3 +290,7 @@ let infix1 = infix1 infix2
 let infix0 = infix0 infix1
 let prefix = prefix infix0
 let exp = exp prefix cases
+
+(* grammer *)
+
+let main = ws *> token exp <* eof ()
