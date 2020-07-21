@@ -6,6 +6,14 @@ $ opam switch create . --deps-only --locked
 $ opam install . --deps-only --with-test --locked
 ```
 
+### inside Docker without privileged
+
+```bash
+$ opam init --bare --no-setup --disable-sandboxing --reinit
+$ opam switch create . --deps-only --locked
+$ opam install . --deps-only --with-test
+```
+
 ## dev
 
 ```bash
