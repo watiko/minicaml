@@ -294,4 +294,4 @@ let exp = exp prefix cases
 
 (* grammer *)
 
-let main = ws *> token exp <* eof ()
+let main = wss *> token exp <* eof ()

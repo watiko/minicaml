@@ -1,7 +1,15 @@
+module Parser = Minicaml.Parser
 module Syntax = Minicaml.Syntax
 module Eval = Minicaml.Eval
 
 let value_testable = Alcotest.testable Syntax.pprint_value ( = )
+
+let parse s =
+  let result = Parser.(parse main (explode s)) in
+  match result with
+  | Some exp -> exp
+  | None -> failwith @@ String.concat "" [ "parse error: "; s ]
+;;
 
 let test_plus () =
   let open Syntax in
@@ -11,6 +19,7 @@ let test_plus () =
     ; "-1 + 1", Plus (IntLit (-1), IntLit 1), IntVal 0
     ; "0 + 10", Plus (IntLit 0, IntLit 10), IntVal 10
     ; "-1 + -2", Plus (IntLit (-1), IntLit (-2)), IntVal (-3)
+    ; "complex", parse "1 + 3 + (-10)", IntVal (-6)
     ]
   in
   List.iter

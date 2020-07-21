@@ -179,3 +179,8 @@ let%test "string" =
 ;;
 
 let token p = p <* wss
+
+let%test "grammer" =
+  let p = wss *> token item <* eof () in
+  Some ('1', []) = p @@ explode " 1 "
+;;
