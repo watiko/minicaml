@@ -67,7 +67,7 @@ and many1 p cs = (List.cons <$> p <*> many p) cs
 let option default p = p <|> pure default
 
 (* optional: e? *)
-let optional p = option () (p *> pure ())
+let optional p = option None (p >>= fun x -> pure @@ Some x)
 
 (* and-predicate:  &e *)
 let andP p cs =
