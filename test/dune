@@ -3,8 +3,3 @@
  (libraries minicaml alcotest)
  (preprocess
   (pps ppx_inline_test)))
-
-(env
- (_
-  (env-vars
-   (ALCOTEST_COLOR always))))
