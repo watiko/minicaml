@@ -5,6 +5,7 @@
 
 (package
   (name minicaml)
+  (maintainers watiko)
   (description "study project")
   (depends
     fmt
