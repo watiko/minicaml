@@ -1,0 +1,43 @@
+name: test
+
+on: [push]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ocaml/opam2:4.10
+    steps:
+      - name: workaround for non root user
+        run: |
+          GROUP=$(stat -c "%g" "$RUNNER_TEMP")
+          sudo groupadd -g $GROUP runner
+          sudo usermod -aG $GROUP $(whoami)
+          sudo chmod g+w "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
+      - uses: actions/checkout@v2
+      - name: setup requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends m4
+      - uses: actions/cache@v2
+        env:
+          cache-version: 20
+        with:
+          path: /home/opam/.opam
+          key:
+            opam-${{ env.cache-version }}-build-${{ hashFiles('**/*.opam.locked') }}
+          restore-keys: |
+            opam-${{ env.cache-version }}-build-
+            opam-${{ env.cache-version }}-
+      - name: setup opam
+        run: |
+          export HOME=/home/opam
+          opam repository add ocamlorg https://opam.ocaml.org
+          opam repository remove default
+          opam update
+          opam install . --deps-only --with-test
+      - name: test
+        run: |
+          export HOME=/home/opam
+          eval $(opam env)
+          dune test
