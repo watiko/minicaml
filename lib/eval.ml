@@ -97,5 +97,20 @@ let rec eval e env =
     (match eval e1 env with
     | ListVal v1 -> ListVal (List.tl v1)
     | v -> failwith @@ "tl: required list type but got: " ^ value_type v)
-  | Match _ -> failwith "not implemented: match"
+  | Match (e1, cases) ->
+    let v1 = eval e1 env in
+    let rec findMatch cases =
+      match cases with
+      | [] -> failwith "match: failed"
+      | (e2, body) :: cases ->
+        (match e2 with
+        | Var x ->
+          let env = ext env x v1 in
+          body, env
+        | _ ->
+          let v2 = eval e2 env in
+          if v1 = v2 then body, env else findMatch cases)
+    in
+    let body, env = findMatch cases in
+    eval body env
 ;;

@@ -216,6 +216,23 @@ let test_list () =
     table
 ;;
 
+let test_match () =
+  let open Syntax in
+  let open Eval in
+  let table =
+    [ "match 1 with 1 -> true", BoolVal true
+    ; "match 3 with | 1 -> 10 | 2 -> 20 | 3 -> 30", IntVal 30
+    ; "match [1] with | 1 :: [] -> true | _ -> false", BoolVal true
+    ; "match [] with | 1 :: [] -> true | _ -> false", BoolVal false
+    ; "match [1; 2; 3] with 1 :: 2 :: 3 :: [] -> true", BoolVal true
+    ]
+  in
+  List.iter
+    (fun (exp, want) ->
+      Alcotest.(check value_testable) exp want (eval (parse exp) @@ defaultenv ()))
+    table
+;;
+
 let () =
   Alcotest.run
     "Eval"
@@ -230,6 +247,7 @@ let () =
         ; Alcotest.test_case "func" `Quick test_func
         ; Alcotest.test_case "letrec" `Quick test_letrec
         ; Alcotest.test_case "list" `Quick test_list
+        ; Alcotest.test_case "match" `Quick test_match
         ] )
     ]
 ;;
