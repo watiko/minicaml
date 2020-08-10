@@ -28,13 +28,22 @@ let rec eval e env =
   | BoolLit b -> BoolVal b
   | Fun (x, e1) -> FunVal (x, e1, env)
   | App (e1, e2) ->
-    (match eval e1 env with
+    let fn = eval e1 env in
+    let arg = eval e2 env in
+    (match fn with
     | FunVal (x, body, fenv) ->
-      let arg = eval e2 env in
-      eval body (ext fenv x arg)
+      let fenv = ext fenv x arg in
+      eval body fenv
+    | RecFunVal (f, x, body, fenv) ->
+      let fenv = ext fenv x arg in
+      let fenv = ext fenv f fn in
+      eval body fenv
     | _ -> failwith "app: function value required")
   | Let (x, e1, e2) ->
     let env = ext env x (eval e1 env) in
+    eval e2 env
+  | LetRec (f, x, e1, e2) ->
+    let env = ext env f (RecFunVal (f, x, e1, env)) in
     eval e2 env
   | Plus (e1, e2) -> binop ( + ) e1 e2 env
   | Minus (e1, e2) -> binop ( - ) e1 e2 env

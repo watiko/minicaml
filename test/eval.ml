@@ -153,6 +153,29 @@ let test_func () =
     table
 ;;
 
+let test_letrec () =
+  let open Syntax in
+  let open Eval in
+  let table =
+    [ "let rec f x = x in f", RecFunVal ("f", "x", Var "x", defaultenv ())
+    ; ( {|
+let fact = fun n ->
+  let rec inner n = fun acc ->
+    if n = 0
+      then acc
+      else inner (n - 1) (acc * n)
+  in inner n 1
+in fact 5|}
+      , IntVal 120 )
+    ; "let x = 1 in let f = fun y -> x + y in let x = 2 in f (x + 3)", IntVal 6
+    ]
+  in
+  List.iter
+    (fun (exp, want) ->
+      Alcotest.(check value_testable) exp want (eval (parse exp) @@ defaultenv ()))
+    table
+;;
+
 let () =
   Alcotest.run
     "Eval"
@@ -164,6 +187,7 @@ let () =
         ; Alcotest.test_case "env" `Quick test_env
         ; Alcotest.test_case "let" `Quick test_let
         ; Alcotest.test_case "func" `Quick test_func
+        ; Alcotest.test_case "letrec" `Quick test_letrec
         ] )
     ]
 ;;
