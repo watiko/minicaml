@@ -80,6 +80,29 @@ let test_eq () =
     table
 ;;
 
+let test_env () =
+  let open Syntax in
+  let open Eval in
+  let env = emptyenv () in
+  let env = ext env "a" (BoolVal false) in
+  let env = ext env "x" (IntVal 1) in
+  let env = ext env "y" (BoolVal true) in
+  let env = ext env "a" (IntVal 100) in
+  let table =
+    [ "lookup from empty", "x", None, emptyenv ()
+    ; "lookup x", "x", Some (IntVal 1), env
+    ; "lookup y", "y", Some (BoolVal true), env
+    ; "lookup latest a", "a", Some (IntVal 100), env
+    ; "notfound", "notexist", None, env
+    ] [@ocamlformat "disable"]
+  in
+  List.iter
+    (fun (name, var, want, env) ->
+      let got = lookup var env in
+      Alcotest.(check @@ option value_testable) name want got)
+    table
+;;
+
 let () =
   Alcotest.run
     "Eval"
@@ -88,6 +111,7 @@ let () =
         ; Alcotest.test_case "times" `Quick test_times
         ; Alcotest.test_case "math" `Quick test_math
         ; Alcotest.test_case "eq" `Quick test_eq
+        ; Alcotest.test_case "env" `Quick test_env
         ] )
     ]
 ;;
