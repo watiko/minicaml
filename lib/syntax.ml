@@ -16,6 +16,7 @@ type exp =
   | Times of exp * exp
   | Div of exp * exp
   | Empty (* [] *)
+  | Unit (* () *)
   | Cons of exp * exp
   | Head of exp
   | Tail of exp
@@ -47,6 +48,7 @@ let exp_name = function
   | Times _ -> "Times"
   | Div _ -> "Div"
   | Empty -> "Empty"
+  | Unit -> "Unit"
   | Cons _ -> "Cons"
   | Head _ -> "Head"
   | Tail _ -> "Tail"
@@ -55,7 +57,7 @@ let exp_name = function
 let rec pprint_exp ppf e =
   let ename = exp_name e in
   match e with
-  | Empty -> Fmt.pf ppf "%s" ename
+  | Empty | Unit -> Fmt.pf ppf "%s" ename
   | Var x -> Fmt.pf ppf "%s %s" ename x
   | IntLit n -> Fmt.pf ppf "%s %d" ename n
   | BoolLit b -> Fmt.pf ppf "%s %b" ename b

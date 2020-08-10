@@ -33,9 +33,7 @@ MiniCaml {
     | PriExp
 
   PriExp =
-    | var
-    | int
-    | bool
+    | Literals
     | lparen Exp rparen -- paren
 
   Cases =
@@ -45,17 +43,23 @@ MiniCaml {
   Pattern =
     | Pattern_inner (colcol Pattern)*
 
-  Pattern_inner =
-    | var
-    | int
-    | bool
-    | empty_list
+  Pattern_inner = Literals
 
   /// tokens
 
   // literal
+  Literals =
+    | var
+    | int
+    | bool
+    | Unit
+    | EmptyList
+
   var = ~keyword (letter | "_") ( alnum | "_" | "'")*
   int = minus? digit+
+  bool = true | false
+  Unit = lparen rparen 
+  EmptyList = lbra rbra
 
   // op
   
@@ -75,9 +79,6 @@ MiniCaml {
   colcol   = "::"
 
   // group
-  
-  empty_list = lbra rbra
-  
   lparen = "("
   rparen = ")"
   lbra   = "["
@@ -101,9 +102,6 @@ MiniCaml {
     | match
     | with
     
-
-  bool = true | false
-
   true  = "true"
   false = "false"
   fun   = "fun"

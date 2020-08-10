@@ -115,6 +115,7 @@ let int =
 (* parser *)
 
 let empty_list = lbra *> wss *> rbra *> pure Empty
+let unitP = lparen *> wss *> rparen *> pure Unit
 
 let literalP =
   choice
@@ -122,6 +123,7 @@ let literalP =
     ; (fun i -> IntLit i) <$> int
     ; (fun b -> BoolLit b) <$> bool
     ; empty_list
+    ; unitP
     ]
 ;;
 
