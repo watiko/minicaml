@@ -92,6 +92,27 @@ let test_eq () =
     table
 ;;
 
+let test_cmp () =
+  let open Syntax in
+  let open Eval in
+  let table =
+    [ "1 > 1", false
+    ; "2 > 1", true
+    ; "1 < 10", true
+    ; "-1 < 10", true
+    ; "2 < 2", false
+    ; "5 > 10", false
+    ] [@ocamlformat "disable"]
+  in
+  List.iter
+    (fun (exp, value) ->
+      Alcotest.(check value_testable)
+        exp
+        (BoolVal value)
+        (eval (parse exp) @@ defaultenv ()))
+    table
+;;
+
 let test_env () =
   let open Syntax in
   let open Eval in
@@ -184,6 +205,7 @@ let () =
         ; Alcotest.test_case "times" `Quick test_times
         ; Alcotest.test_case "math" `Quick test_math
         ; Alcotest.test_case "eq" `Quick test_eq
+        ; Alcotest.test_case "cmp" `Quick test_cmp
         ; Alcotest.test_case "env" `Quick test_env
         ; Alcotest.test_case "let" `Quick test_let
         ; Alcotest.test_case "func" `Quick test_func

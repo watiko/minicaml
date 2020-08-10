@@ -19,6 +19,11 @@ let rec eval e env =
     | IntVal n1, IntVal n2 -> IntVal (f n1 n2)
     | _ -> failwith "integer values expected"
   in
+  let condop f e1 e2 env =
+    match eval e1 env, eval e2 env with
+    | IntVal n1, IntVal n2 -> BoolVal (f n1 n2)
+    | _ -> failwith "integer values expected"
+  in
   match e with
   | Var x ->
     (match lookup x env with
@@ -50,6 +55,8 @@ let rec eval e env =
   | Times (e1, e2) -> binop ( * ) e1 e2 env
   | Div (e1, e2) -> binop ( / ) e1 e2 env
   | Unit -> UnitVal
+  | Greater (e1, e2) -> condop ( > ) e1 e2 env
+  | Less (e1, e2) -> condop ( < ) e1 e2 env
   | Eq (e1, e2) ->
     (match eval e1 env, eval e2 env with
     | IntVal n1, IntVal n2 -> BoolVal (n1 = n2)
