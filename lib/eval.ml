@@ -1,6 +1,7 @@
 open Syntax
 
 let rec eval e =
+  let ename = exp_name e in
   match e with
   | IntLit n -> IntVal n
   | BoolLit b -> BoolVal b
@@ -8,9 +9,17 @@ let rec eval e =
     (match eval e1, eval e2 with
     | IntVal n1, IntVal n2 -> IntVal (n1 + n2)
     | _ -> failwith "integer values expected")
+  | Minus (e1, e2) ->
+    (match eval e1, eval e2 with
+    | IntVal n1, IntVal n2 -> IntVal (n1 - n2)
+    | _ -> failwith "integer values expected")
   | Times (e1, e2) ->
     (match eval e1, eval e2 with
     | IntVal n1, IntVal n2 -> IntVal (n1 * n2)
+    | _ -> failwith "integer values expected")
+  | Div (e1, e2) ->
+    (match eval e1, eval e2 with
+    | IntVal n1, IntVal n2 -> IntVal (n1 / n2)
     | _ -> failwith "integer values expected")
   | Eq (e1, e2) ->
     (match eval e1, eval e2 with
@@ -22,5 +31,5 @@ let rec eval e =
     | BoolVal true -> eval e1
     | BoolVal false -> eval e2
     | _ -> failwith "if: cond type is not bool")
-  | _ -> failwith "not implemented"
+  | _ -> failwith @@ String.concat "" [ "not implemented: "; ename ]
 ;;
