@@ -20,8 +20,15 @@ let rec eval e env =
     | _ -> failwith "integer values expected"
   in
   match e with
+  | Var x ->
+    (match lookup x env with
+    | Some v -> v
+    | None -> failwith @@ "lookup failed with key: " ^ x)
   | IntLit n -> IntVal n
   | BoolLit b -> BoolVal b
+  | Let (x, e1, e2) ->
+    let env = ext env x (eval e1 env) in
+    eval e2 env
   | Plus (e1, e2) -> binop ( + ) e1 e2 env
   | Minus (e1, e2) -> binop ( - ) e1 e2 env
   | Times (e1, e2) -> binop ( * ) e1 e2 env

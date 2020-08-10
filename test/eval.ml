@@ -115,6 +115,24 @@ let test_env () =
     table
 ;;
 
+let test_let () =
+  let open Syntax in
+  let open Eval in
+  let table =
+    [ "let b = true in b", BoolVal true
+    ; "let x = (3 * 11) in x", IntVal 33
+    ; "let x = 10 in let y = 22 in x + y", IntVal 32
+    ; "let x = 10 in let y = (100 / x) in y / x", IntVal 1
+    ; "let x = 1 in let x = 2 in x", IntVal 2
+    ; "let x = 1 in (let x = 2 in x + 1) + (x * 2)", IntVal 5
+    ] [@ocamlformat "disable"]
+  in
+  List.iter
+    (fun (exp, want) ->
+      Alcotest.(check value_testable) exp want (eval (parse exp) @@ defaultenv ()))
+    table
+;;
+
 let () =
   Alcotest.run
     "Eval"
@@ -124,6 +142,7 @@ let () =
         ; Alcotest.test_case "math" `Quick test_math
         ; Alcotest.test_case "eq" `Quick test_eq
         ; Alcotest.test_case "env" `Quick test_env
+        ; Alcotest.test_case "let" `Quick test_let
         ] )
     ]
 ;;
