@@ -55,6 +55,15 @@ let exp_name = function
   | Tail _ -> "Tail"
 ;;
 
+let value_type = function
+  | UnitVal -> "unit"
+  | IntVal _ -> "int"
+  | BoolVal _ -> "bool"
+  | ListVal _ -> "list"
+  | FunVal _ -> "fun"
+  | RecFunVal _ -> "fun"
+;;
+
 let rec pprint_exp ppf e =
   let ename = exp_name e in
   match e with

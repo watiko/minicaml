@@ -68,24 +68,34 @@ let rec eval e env =
     | IntVal n1, IntVal n2 -> BoolVal (n1 = n2)
     | BoolVal b1, BoolVal b2 -> BoolVal (b1 = b2)
     | ListVal l1, ListVal l2 -> BoolVal (l1 = l2)
-    | _ -> failwith "eq: compared expressions type mismatch")
+    | v1, v2 ->
+      failwith
+      @@ "eq: compared expressions type mismatch: "
+      ^ value_type v1
+      ^ ", "
+      ^ value_type v2)
   | If (c, e1, e2) ->
     (match eval c env with
     | BoolVal true -> eval e1 env
     | BoolVal false -> eval e2 env
-    | _ -> failwith "if: cond type is not bool")
+    | v -> failwith @@ "if: cond type is not bool but got: " ^ value_type v)
   | Empty -> ListVal []
   | Cons (e1, e2) ->
     (match eval e1 env, eval e2 env with
     | v1, ListVal v2 -> ListVal (v1 :: v2)
-    | _ -> failwith "cons: required list type")
+    | v1, v2 ->
+      failwith
+      @@ "cons: required list type but got: "
+      ^ value_type v1
+      ^ ", "
+      ^ value_type v2)
   | Head e1 ->
     (match eval e1 env with
     | ListVal v1 -> List.hd v1
-    | _ -> failwith "hd: required list type")
+    | v -> failwith @@ "hd: required list type but got: " ^ value_type v)
   | Tail e1 ->
     (match eval e1 env with
     | ListVal v1 -> ListVal (List.tl v1)
-    | _ -> failwith "tl: required list type")
+    | v -> failwith @@ "tl: required list type but got: " ^ value_type v)
   | Match _ -> failwith "not implemented: match"
 ;;
