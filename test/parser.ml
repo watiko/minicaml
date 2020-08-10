@@ -12,6 +12,10 @@ let test_tokens () =
   let open Parser in
   let open Syntax in
   Alcotest.(check (option string))
+    "not_keyword"
+    (Some "inner")
+    (parse var (explode "inner"));
+  Alcotest.(check (option string))
     "var(complex)"
     (Some "a_a'0a")
     (parse var (explode "a_a'0a"));

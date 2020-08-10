@@ -55,11 +55,13 @@ MiniCaml {
     | Unit
     | EmptyList
 
-  var = ~keyword (letter | "_") ( alnum | "_" | "'")*
+  var = ~keyword id
   int = minus? digit+
   bool = true | false
   Unit = lparen rparen 
   EmptyList = lbra rbra
+
+  id = (letter | "_") ( alnum | "_" | "'")*
 
   // op
   
@@ -102,17 +104,17 @@ MiniCaml {
     | match
     | with
     
-  true  = "true"
-  false = "false"
-  fun   = "fun"
-  let   = "let"
-  rec   = "rec"
-  in    = "in"
-  if    = "if"
-  then  = "then"
-  else  = "else"
-  match = "match"
-  with  = "with"
+  true  = "true"  ~id
+  false = "false" ~id
+  fun   = "fun"   ~id
+  let   = "let"   ~id
+  rec   = "rec"   ~id
+  in    = "in"    ~id
+  if    = "if"    ~id
+  then  = "then"  ~id
+  else  = "else"  ~id
+  match = "match" ~id
+  with  = "with"  ~id
 
   // control
   eof = end

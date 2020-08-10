@@ -27,6 +27,12 @@ module Token = struct
     | Slash
 end
 
+let idP =
+  let* d = letter <|> char '_' in
+  let* ds = many (alnum <|> char '_' <|> char '\'') in
+  pure @@ Peg.Utils.implode (d :: ds)
+;;
+
 let trueP = string "true"
 let falseP = string "false"
 let funP = string "fun"
@@ -41,17 +47,22 @@ let withP = string "with"
 let bool = trueP *> pure true <|> falseP *> pure false
 
 let keyword =
-  trueP
-  <|> falseP
-  <|> funP
-  <|> letP
-  <|> recP
-  <|> inP
-  <|> ifP
-  <|> thenP
-  <|> elseP
-  <|> matchP
-  <|> withP
+  let px =
+    [ trueP
+    ; falseP
+    ; funP
+    ; letP
+    ; recP
+    ; inP
+    ; ifP
+    ; thenP
+    ; elseP
+    ; matchP
+    ; withP
+    ] [@ocamlformat "disable"]
+  in
+  let px = List.map (fun p -> p <* notP idP) px in
+  choice px
 ;;
 
 (* termination *)
@@ -97,12 +108,7 @@ let infix3op =
 
 (* literal *)
 
-let var =
-  let* _ = notP keyword in
-  let* d = letter <|> char '_' in
-  let* ds = many (alnum <|> char '_' <|> char '\'') in
-  pure @@ Peg.Utils.implode (d :: ds)
-;;
+let var = notP keyword *> idP
 
 let int =
   let* neg = option false (minus *> pure true) in
