@@ -4,6 +4,7 @@ type env = Syntax.env
 
 let emptyenv () = ([] : env)
 let ext (env : env) x v = (x, v) :: env
+let defaultenv = emptyenv
 
 let rec lookup x env =
   match env with
@@ -11,29 +12,29 @@ let rec lookup x env =
   | (y, v) :: rest -> if x = y then Some v else lookup x rest
 ;;
 
-let rec eval e =
+let rec eval e env =
   let ename = exp_name e in
-  let binop f e1 e2 =
-    match eval e1, eval e2 with
+  let binop f e1 e2 env =
+    match eval e1 env, eval e2 env with
     | IntVal n1, IntVal n2 -> IntVal (f n1 n2)
     | _ -> failwith "integer values expected"
   in
   match e with
   | IntLit n -> IntVal n
   | BoolLit b -> BoolVal b
-  | Plus (e1, e2) -> binop ( + ) e1 e2
-  | Minus (e1, e2) -> binop ( - ) e1 e2
-  | Times (e1, e2) -> binop ( * ) e1 e2
-  | Div (e1, e2) -> binop ( / ) e1 e2
+  | Plus (e1, e2) -> binop ( + ) e1 e2 env
+  | Minus (e1, e2) -> binop ( - ) e1 e2 env
+  | Times (e1, e2) -> binop ( * ) e1 e2 env
+  | Div (e1, e2) -> binop ( / ) e1 e2 env
   | Eq (e1, e2) ->
-    (match eval e1, eval e2 with
+    (match eval e1 env, eval e2 env with
     | IntVal n1, IntVal n2 -> BoolVal (n1 = n2)
     | BoolVal b1, BoolVal b2 -> BoolVal (b1 = b2)
     | _ -> failwith "eq: compared expressions type mismatch")
   | If (c, e1, e2) ->
-    (match eval c with
-    | BoolVal true -> eval e1
-    | BoolVal false -> eval e2
+    (match eval c env with
+    | BoolVal true -> eval e1 env
+    | BoolVal false -> eval e2 env
     | _ -> failwith "if: cond type is not bool")
   | _ -> failwith @@ "not implemented: " ^ ename
 ;;

@@ -24,7 +24,10 @@ let test_plus () =
   in
   List.iter
     (fun (exp, value) ->
-      Alcotest.(check value_testable) exp (IntVal value) (eval @@ parse exp))
+      Alcotest.(check value_testable)
+        exp
+        (IntVal value)
+        (eval (parse exp) @@ defaultenv ()))
     table
 ;;
 
@@ -41,7 +44,10 @@ let test_times () =
   in
   List.iter
     (fun (exp, value) ->
-      Alcotest.(check value_testable) exp (IntVal value) (eval @@ parse exp))
+      Alcotest.(check value_testable)
+        exp
+        (IntVal value)
+        (eval (parse exp) @@ defaultenv ()))
     table
 ;;
 
@@ -58,7 +64,10 @@ let test_math () =
   in
   List.iter
     (fun (exp, value) ->
-      Alcotest.(check value_testable) exp (IntVal value) (eval @@ parse exp))
+      Alcotest.(check value_testable)
+        exp
+        (IntVal value)
+        (eval (parse exp) @@ defaultenv ()))
     table
 ;;
 
@@ -76,7 +85,10 @@ let test_eq () =
   in
   List.iter
     (fun (exp, value) ->
-      Alcotest.(check value_testable) exp (BoolVal value) (eval @@ parse exp))
+      Alcotest.(check value_testable)
+        exp
+        (BoolVal value)
+        (eval (parse exp) @@ defaultenv ()))
     table
 ;;
 
