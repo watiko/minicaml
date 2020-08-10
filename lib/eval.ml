@@ -24,5 +24,5 @@ let rec eval e =
     | BoolVal true -> eval e1
     | BoolVal false -> eval e2
     | _ -> failwith "if: cond type is not bool")
-  | _ -> failwith @@ String.concat "" [ "not implemented: "; ename ]
+  | _ -> failwith @@ "not implemented: " ^ ename 
 ;;

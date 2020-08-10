@@ -8,7 +8,7 @@ let parse s =
   let result = Parser.(parse main (explode s)) in
   match result with
   | Some exp -> exp
-  | None -> failwith @@ String.concat "" [ "parse error: "; s ]
+  | None -> failwith @@ "parse error: " ^ s
 ;;
 
 let test_plus () =
