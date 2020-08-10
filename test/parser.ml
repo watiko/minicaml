@@ -81,7 +81,11 @@ let test_list () =
   let i n = IntLit n in
   exp_test "empty" Empty "[]";
   exp_test "simple" (Cons (i 1, Empty)) "1 :: []";
-  exp_test "simple" (Cons (i 1, Cons (i 2, Cons (i 3, Empty)))) "1 :: 2 :: 3 :: []"
+  exp_test "simple long" (Cons (i 1, Cons (i 2, Cons (i 3, Empty)))) "1 :: 2 :: 3 :: []";
+  exp_test "literal one" (Cons (i 1, Empty)) "[1]";
+  exp_test "literal one'" (Cons (i 1, Empty)) "[1;]";
+  exp_test "literal two" (Cons (i 1, Cons (i 2, Empty))) "[1; 2]";
+  exp_test "literal two'" (Cons (i 1, Cons (i 2, Empty))) "[1; 2;]"
 ;;
 
 let test_fn () =
@@ -111,7 +115,9 @@ let () =
         ; Alcotest.test_case "pattern" `Quick test_pattern
         ; Alcotest.test_case "match" `Quick test_match
         ; Alcotest.test_case "math" `Quick test_math
+        ; Alcotest.test_case "list" `Quick test_list
         ; Alcotest.test_case "fn" `Quick test_fn
+        ; Alcotest.test_case "let" `Quick test_let
         ; Alcotest.test_case "if" `Quick test_if
         ] )
     ]

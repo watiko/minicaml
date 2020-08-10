@@ -45,16 +45,19 @@ MiniCaml {
 
   Pattern_inner = Literals
 
-  /// tokens
-
-  // literal
   Literals =
     | var
     | int
     | bool
     | Unit
     | EmptyList
+    | List
+  
+  List = lbra Exp (semicol Exp)* semicol? rbra
 
+  /// tokens
+
+  // literal
   var = ~keyword id
   int = minus? digit+
   bool = true | false

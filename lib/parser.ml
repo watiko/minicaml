@@ -118,20 +118,10 @@ let int =
   pure value
 ;;
 
-(* parser *)
-
 let empty_list = lbra *> wss *> rbra *> pure Empty
 let unitP = lparen *> wss *> rparen *> pure Unit
 
-let literalP =
-  choice
-    [ (fun v -> Var v) <$> var
-    ; (fun i -> IntLit i) <$> int
-    ; (fun b -> BoolLit b) <$> bool
-    ; empty_list
-    ; unitP
-    ]
-;;
+(* parser *)
 
 let exp prefix cases =
   fix (fun exp ->
@@ -201,7 +191,7 @@ let infix1 infix2 =
       let pair a b = a, b in
       let f (op, e1) e2 =
         match op with
-        | Token.Colcol -> Cons (e1, e2)
+        | Token.Colcol -> Cons (e2, e1)
       in
       let* e1 = token infix2 in
       let* es = many (pair <$> token infix1opR <*> token infix1) in
@@ -252,15 +242,15 @@ let exp_from priexp cases =
   exp
 ;;
 
-let priexp cases =
+let priexp cases literalP =
   fix (fun priexp ->
       let exp = exp_from priexp cases in
       literalP <|> (lparen *> token exp <* rparen))
 ;;
 
-let cases pattern =
+let cases pattern literalP =
   fix (fun cases ->
-      let priexp = priexp cases in
+      let priexp = priexp cases literalP in
       let exp = exp_from priexp cases in
       let single_pair =
         let* e1 = token pattern in
@@ -285,13 +275,47 @@ let pattern pattern_inner =
         pure r)
 ;;
 
-let pattern_inner = literalP
+let pattern_inner literalP = literalP
+
+let literalP list =
+  choice
+    [ (fun v -> Var v) <$> var
+    ; (fun i -> IntLit i) <$> int
+    ; (fun b -> BoolLit b) <$> bool
+    ; unitP
+    ; empty_list
+    ; list
+    ]
+;;
+
+let list =
+  fix (fun list ->
+      let literalP = literalP list in
+      let pattern_inner = pattern_inner literalP in
+      let pattern = pattern pattern_inner in
+      let cases = cases pattern literalP in
+      let priexp = priexp cases literalP in
+      let exp = exp_from priexp cases in
+      let* _ = token lbra in
+      let* e = token exp in
+      let* es = many (token semicol *> token exp) in
+      let* _ = optional @@ token semicol in
+      let* _ = token rbra in
+      match es with
+      | [] -> pure @@ Cons (e, Empty)
+      | _ ->
+        let es = e :: es in
+        let r = List.fold_right (fun e acc -> Cons (e, acc)) es Empty in
+        pure r)
+;;
 
 (* fix *)
 
+let literalP = literalP list
+let pattern_inner = pattern_inner literalP
 let pattern = pattern pattern_inner
-let cases = cases pattern
-let priexp = priexp cases
+let cases = cases pattern literalP
+let priexp = priexp cases literalP
 let infix4 = infix4 priexp
 let infix3 = infix3 infix4
 let infix2 = infix2 infix3
