@@ -133,6 +133,26 @@ let test_let () =
     table
 ;;
 
+let test_func () =
+  let open Syntax in
+  let open Eval in
+  let table =
+    [ "fun x -> x", FunVal ("x", Var "x", defaultenv ())
+    ; "fun _ -> 100", FunVal ("_", IntLit 100, defaultenv ())
+    ; ( "let outer = 1 in let id = fun x -> x in id"
+      , FunVal ("x", Var "x", ext (defaultenv ()) "outer" (IntVal 1)) )
+    ; "let outer = 2 in let f = fun _ -> outer in f ()", IntVal 2
+    ; "let id = fun x -> x in id 100", IntVal 100
+    ; "let add = fun x -> fun y -> x + y in add 100 11", IntVal 111
+    ; "let x = 1 in let f = fun y -> x + y in let x = 2 in f (x + 3)", IntVal 6
+    ]
+  in
+  List.iter
+    (fun (exp, want) ->
+      Alcotest.(check value_testable) exp want (eval (parse exp) @@ defaultenv ()))
+    table
+;;
+
 let () =
   Alcotest.run
     "Eval"
@@ -143,6 +163,7 @@ let () =
         ; Alcotest.test_case "eq" `Quick test_eq
         ; Alcotest.test_case "env" `Quick test_env
         ; Alcotest.test_case "let" `Quick test_let
+        ; Alcotest.test_case "func" `Quick test_func
         ] )
     ]
 ;;

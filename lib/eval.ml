@@ -26,6 +26,13 @@ let rec eval e env =
     | None -> failwith @@ "lookup failed with key: " ^ x)
   | IntLit n -> IntVal n
   | BoolLit b -> BoolVal b
+  | Fun (x, e1) -> FunVal (x, e1, env)
+  | App (e1, e2) ->
+    (match eval e1 env with
+    | FunVal (x, body, fenv) ->
+      let arg = eval e2 env in
+      eval body (ext fenv x arg)
+    | _ -> failwith "app: function value required")
   | Let (x, e1, e2) ->
     let env = ext env x (eval e1 env) in
     eval e2 env
@@ -33,6 +40,7 @@ let rec eval e env =
   | Minus (e1, e2) -> binop ( - ) e1 e2 env
   | Times (e1, e2) -> binop ( * ) e1 e2 env
   | Div (e1, e2) -> binop ( / ) e1 e2 env
+  | Unit -> UnitVal
   | Eq (e1, e2) ->
     (match eval e1 env, eval e2 env with
     | IntVal n1, IntVal n2 -> BoolVal (n1 = n2)

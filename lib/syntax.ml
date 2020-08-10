@@ -22,6 +22,7 @@ type exp =
   | Tail of exp
 
 type value =
+  | UnitVal
   | IntVal of int
   | BoolVal of bool
   | ListVal of value list
@@ -86,6 +87,7 @@ let rec pprint_exp ppf e =
 ;;
 
 let rec pprint_value ppf = function
+  | UnitVal -> Fmt.pf ppf "UnitVal"
   | IntVal n -> Fmt.pf ppf "IntVal %d" n
   | BoolVal b -> Fmt.pf ppf "BoolVal %b" b
   | ListVal l -> Fmt.pf ppf "@[<v 2>ListVal@ %a@]" (Fmt.list pprint_value) l
