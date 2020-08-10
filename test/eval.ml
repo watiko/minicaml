@@ -197,6 +197,25 @@ in fact 5|}
     table
 ;;
 
+let test_list () =
+  let open Syntax in
+  let open Eval in
+  let table =
+    [ "List.hd [1; 2; 3]", IntVal 1
+    ; "List.tl [1; 2; 3]", ListVal [ IntVal 2; IntVal 3 ]
+    ; "List.hd [[1]; [2]]", ListVal [ IntVal 1 ]
+    ; "[1; 2] = [1; 2]", BoolVal true
+    ; "[2; 1] = [1; 2]", BoolVal false
+    ; "[1] = [1; 2]", BoolVal false
+    ; "[true] = [true]", BoolVal true
+    ]
+  in
+  List.iter
+    (fun (exp, want) ->
+      Alcotest.(check value_testable) exp want (eval (parse exp) @@ defaultenv ()))
+    table
+;;
+
 let () =
   Alcotest.run
     "Eval"
@@ -210,6 +229,7 @@ let () =
         ; Alcotest.test_case "let" `Quick test_let
         ; Alcotest.test_case "func" `Quick test_func
         ; Alcotest.test_case "letrec" `Quick test_letrec
+        ; Alcotest.test_case "list" `Quick test_list
         ] )
     ]
 ;;

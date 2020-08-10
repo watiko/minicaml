@@ -29,7 +29,7 @@ end
 
 let idP =
   let* d = letter <|> char '_' in
-  let* ds = many (alnum <|> char '_' <|> char '\'') in
+  let* ds = many (alnum <|> char '.' <|> char '_' <|> char '\'') in
   pure @@ Peg.Utils.implode (d :: ds)
 ;;
 

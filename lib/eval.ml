@@ -4,7 +4,14 @@ type env = Syntax.env
 
 let emptyenv () = ([] : env)
 let ext (env : env) x v = (x, v) :: env
-let defaultenv = emptyenv
+
+let defaultenv () =
+  let eenv = emptyenv () in
+  let env = eenv in
+  let env = ext env "List.hd" (FunVal ("l", Head (Var "l"), eenv)) in
+  let env = ext env "List.tl" (FunVal ("l", Tail (Var "l"), eenv)) in
+  env
+;;
 
 let rec lookup x env =
   match env with
@@ -13,7 +20,6 @@ let rec lookup x env =
 ;;
 
 let rec eval e env =
-  let ename = exp_name e in
   let binop f e1 e2 env =
     match eval e1 env, eval e2 env with
     | IntVal n1, IntVal n2 -> IntVal (f n1 n2)
@@ -61,11 +67,25 @@ let rec eval e env =
     (match eval e1 env, eval e2 env with
     | IntVal n1, IntVal n2 -> BoolVal (n1 = n2)
     | BoolVal b1, BoolVal b2 -> BoolVal (b1 = b2)
+    | ListVal l1, ListVal l2 -> BoolVal (l1 = l2)
     | _ -> failwith "eq: compared expressions type mismatch")
   | If (c, e1, e2) ->
     (match eval c env with
     | BoolVal true -> eval e1 env
     | BoolVal false -> eval e2 env
     | _ -> failwith "if: cond type is not bool")
-  | _ -> failwith @@ "not implemented: " ^ ename
+  | Empty -> ListVal []
+  | Cons (e1, e2) ->
+    (match eval e1 env, eval e2 env with
+    | v1, ListVal v2 -> ListVal (v1 :: v2)
+    | _ -> failwith "cons: required list type")
+  | Head e1 ->
+    (match eval e1 env with
+    | ListVal v1 -> List.hd v1
+    | _ -> failwith "hd: required list type")
+  | Tail e1 ->
+    (match eval e1 env with
+    | ListVal v1 -> ListVal (List.tl v1)
+    | _ -> failwith "tl: required list type")
+  | Match _ -> failwith "not implemented: match"
 ;;

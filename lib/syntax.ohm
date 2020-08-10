@@ -64,7 +64,7 @@ MiniCaml {
   Unit = lparen rparen 
   EmptyList = lbra rbra
 
-  id = (letter | "_") ( alnum | "_" | "'")*
+  id = (letter | "_") ( alnum | "." | "_" | "'")*
 
   // op
   
