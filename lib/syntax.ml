@@ -90,7 +90,7 @@ let rec pprint_exp ppf e =
     Fmt.pf ppf "@[<v 2>%s@ %s@ %s@ %a@ %a@]" ename n x pprint_exp e1 pprint_exp e2
   | Match (e, es) ->
     let pprint_pattern ppf (e1, e2) =
-      Fmt.pf ppf "@[<v 2>%a %a@]" pprint_exp e1 pprint_exp e2
+      Fmt.pf ppf "@[<v 2>%a@]" (Fmt.pair ~sep:Fmt.semi pprint_exp pprint_exp) (e1, e2)
     in
     Fmt.pf ppf "@[<v 2>%s@ %a@ %a@]" ename pprint_exp e (Fmt.list pprint_pattern) es
 ;;

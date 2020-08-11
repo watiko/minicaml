@@ -225,6 +225,11 @@ let test_match () =
     ; "match [1] with | 1 :: [] -> true | _ -> false", BoolVal true
     ; "match [] with | 1 :: [] -> true | _ -> false", BoolVal false
     ; "match [1; 2; 3] with 1 :: 2 :: 3 :: [] -> true", BoolVal true
+    ; "match 1 with | 0 -> -1 | 100 -> -1 | i -> i", IntVal 1
+    ; "match [1] with h :: [] -> h", IntVal 1
+    ; "match [1; 2; 3] with | _ :: [] -> 1 | _ :: _ -> 2", IntVal 2
+    ; "match [1; 2; 3] with h :: _  -> h", IntVal 1
+    ; "match [1; 2; 3] with _ :: tl -> tl", ListVal [ IntVal 2; IntVal 3 ]
     ]
   in
   List.iter

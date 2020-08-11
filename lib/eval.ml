@@ -101,16 +101,30 @@ let rec eval e env =
     let v1 = eval e1 env in
     let rec findMatch cases =
       match cases with
-      | [] -> failwith "match: failed"
+      | [] -> None
       | (e2, body) :: cases ->
         (match e2 with
+        | Cons (Var h, Empty) ->
+          (match v1 with
+          | ListVal [ hv ] ->
+            let env = ext env h hv in
+            Some (body, env)
+          | _ -> findMatch cases)
+        | Cons (Var h, Var tl) ->
+          (match v1 with
+          | ListVal (hv :: tlv) ->
+            let env = ext env h hv in
+            let env = ext env tl (ListVal tlv) in
+            Some (body, env)
+          | _ -> findMatch cases)
         | Var x ->
           let env = ext env x v1 in
-          body, env
+          Some (body, env)
         | _ ->
           let v2 = eval e2 env in
-          if v1 = v2 then body, env else findMatch cases)
+          if v1 = v2 then Some (body, env) else findMatch cases)
     in
-    let body, env = findMatch cases in
-    eval body env
+    (match findMatch cases with
+    | None -> failwith "match: failed"
+    | Some (body, env) -> eval body env)
 ;;

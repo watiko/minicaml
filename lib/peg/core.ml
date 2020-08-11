@@ -61,7 +61,6 @@ let ( </> ) = ( <|> )
 
 (* zero-or-more: e* *)
 let rec many p cs = (many1 p <|> pure []) cs
-
 (* one-or-more: e+ *)
 and many1 p cs = (List.cons <$> p <*> many p) cs
 
