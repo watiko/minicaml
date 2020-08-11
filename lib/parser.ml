@@ -123,57 +123,59 @@ let unitP = lparen *> wss *> rparen *> pure Unit
 
 (* parser *)
 
-let exp prefix cases =
-  fix (fun exp ->
-      let funP' =
-        let* _ = token funP in
-        let* x = token var in
-        let* _ = token arrow in
-        let* e = token exp in
-        pure @@ Fun (x, e)
-      in
-      let letP' =
-        let* _ = token letP in
-        let* x = token var in
-        let* _ = token equal in
-        let* e1 = token exp in
-        let* _ = token inP in
-        let* e2 = token exp in
-        pure @@ Let (x, e1, e2)
-      in
-      let letRecP =
-        let* _ = token letP in
-        let* _ = token recP in
-        let* n = token var in
-        let* x = token var in
-        let* _ = token equal in
-        let* e1 = token exp in
-        let* _ = token inP in
-        let* e2 = token exp in
-        pure @@ LetRec (n, x, e1, e2)
-      in
-      let ifP' =
-        let* _ = token ifP in
-        let* ce = token exp in
-        let* _ = token thenP in
-        let* e1 = token exp in
-        let* _ = token elseP in
-        let* e2 = token exp in
-        pure @@ If (ce, e1, e2)
-      in
-      let matchP' =
-        let* _ = token matchP in
-        let* e = token exp in
-        let* _ = token withP in
-        let* cs = token cases in
-        pure @@ Match (e, cs)
-      in
-      choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ])
-;;
+let rec exp () =
+  let exp = pure () >>= exp in
+  let cases = pure () >>= cases in
+  let prefix = pure () >>= prefix in
+  let funP' =
+    let* _ = token funP in
+    let* x = token var in
+    let* _ = token arrow in
+    let* e = token exp in
+    pure @@ Fun (x, e)
+  in
+  let letP' =
+    let* _ = token letP in
+    let* x = token var in
+    let* _ = token equal in
+    let* e1 = token exp in
+    let* _ = token inP in
+    let* e2 = token exp in
+    pure @@ Let (x, e1, e2)
+  in
+  let letRecP =
+    let* _ = token letP in
+    let* _ = token recP in
+    let* n = token var in
+    let* x = token var in
+    let* _ = token equal in
+    let* e1 = token exp in
+    let* _ = token inP in
+    let* e2 = token exp in
+    pure @@ LetRec (n, x, e1, e2)
+  in
+  let ifP' =
+    let* _ = token ifP in
+    let* ce = token exp in
+    let* _ = token thenP in
+    let* e1 = token exp in
+    let* _ = token elseP in
+    let* e2 = token exp in
+    pure @@ If (ce, e1, e2)
+  in
+  let matchP' =
+    let* _ = token matchP in
+    let* e = token exp in
+    let* _ = token withP in
+    let* cs = token cases in
+    pure @@ Match (e, cs)
+  in
+  choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ]
 
-let prefix infix0 = infix0
+and prefix () = infix0 ()
 
-let infix0 infix1 =
+and infix0 () =
+  let infix1 = pure () >>= infix1 in
   let pair a b = a, b in
   let f e1 (op, e2) =
     match op with
@@ -184,21 +186,21 @@ let infix0 infix1 =
   let* e1 = token infix1 in
   let* es = many (pair <$> token infix0op <*> token infix1) in
   pure @@ List.fold_left f e1 es
-;;
 
-let infix1 infix2 =
-  fix (fun infix1 ->
-      let pair a b = a, b in
-      let f (op, e1) e2 =
-        match op with
-        | Token.Colcol -> Cons (e2, e1)
-      in
-      let* e1 = token infix2 in
-      let* es = many (pair <$> token infix1opR <*> token infix1) in
-      pure @@ List.fold_right f es e1)
-;;
+and infix1 () =
+  let infix1 = pure () >>= infix1 in
+  let infix2 = pure () >>= infix2 in
+  let pair a b = a, b in
+  let f (op, e1) e2 =
+    match op with
+    | Token.Colcol -> Cons (e2, e1)
+  in
+  let* e1 = token infix2 in
+  let* es = many (pair <$> token infix1opR <*> token infix1) in
+  pure @@ List.fold_right f es e1
 
-let infix2 infix3 =
+and infix2 () =
+  let infix3 = pure () >>= infix3 in
   let pair a b = a, b in
   let f e1 (op, e2) =
     match op with
@@ -208,9 +210,9 @@ let infix2 infix3 =
   let* e1 = token infix3 in
   let* es = many (pair <$> token infix2op <*> token infix3) in
   pure @@ List.fold_left f e1 es
-;;
 
-let infix3 infix4 =
+and infix3 () =
+  let infix4 = pure () >>= infix4 in
   let pair a b = a, b in
   let f e1 (op, e2) =
     match op with
@@ -220,64 +222,50 @@ let infix3 infix4 =
   let* e1 = token infix4 in
   let* es = many (pair <$> token infix3op <*> token infix4) in
   pure @@ List.fold_left f e1 es
-;;
 
-let infix4 priexp =
+and infix4 () =
+  let priexp = pure () >>= priexp in
   let apply =
     let* fn = token priexp in
     let* es = many1 (token priexp) in
     pure @@ List.fold_left (fun e1 e2 -> App (e1, e2)) fn es
   in
   apply <|> priexp
-;;
 
-let exp_from priexp cases =
-  let infix4 = infix4 priexp in
-  let infix3 = infix3 infix4 in
-  let infix2 = infix2 infix3 in
-  let infix1 = infix1 infix2 in
-  let infix0 = infix0 infix1 in
-  let prefix = prefix infix0 in
-  let exp = exp prefix cases in
-  exp
-;;
+and priexp () =
+  let exp = pure () >>= exp in
+  let literalP = pure () >>= literalP in
+  literalP <|> (lparen *> token exp <* rparen)
 
-let priexp cases literalP =
-  fix (fun priexp ->
-      let exp = exp_from priexp cases in
-      literalP <|> (lparen *> token exp <* rparen))
-;;
+and cases () =
+  let exp = pure () >>= exp in
+  let pattern = pure () >>= pattern in
+  let single_pair =
+    let* e1 = token pattern in
+    let* _ = token arrow in
+    let* e2 = token exp in
+    pure (e1, e2)
+  in
+  let single = List.cons <$> single_pair <*> pure [] in
+  let multiple = many1 (token vbar *> single_pair) in
+  single <|> multiple
 
-let cases pattern literalP =
-  fix (fun cases ->
-      let priexp = priexp cases literalP in
-      let exp = exp_from priexp cases in
-      let single_pair =
-        let* e1 = token pattern in
-        let* _ = token arrow in
-        let* e2 = token exp in
-        pure (e1, e2)
-      in
-      let single = List.cons <$> single_pair <*> pure [] in
-      let multiple = many1 (token vbar *> single_pair) in
-      single <|> multiple)
-;;
+and pattern () =
+  let pattern = pure () >>= pattern in
+  let pattern_inner = pure () >>= pattern_inner in
+  let* p = token pattern_inner in
+  let* ps = many (token colcol *> token pattern) in
+  match ps with
+  | [] -> pure p
+  | _ ->
+    let ps = p :: ps in
+    let r = Utils.fold_right1 (fun p acc -> Cons (p, acc)) ps in
+    pure r
 
-let pattern pattern_inner =
-  fix (fun pattern ->
-      let* p = token pattern_inner in
-      let* ps = many (token colcol *> token pattern) in
-      match ps with
-      | [] -> pure p
-      | _ ->
-        let ps = p :: ps in
-        let r = Utils.fold_right1 (fun p acc -> Cons (p, acc)) ps in
-        pure r)
-;;
+and pattern_inner () = literalP ()
 
-let pattern_inner literalP = literalP
-
-let literalP list =
+and literalP () =
+  let list = pure () >>= list in
   choice
     [ (fun v -> Var v) <$> var
     ; (fun i -> IntLit i) <$> int
@@ -286,44 +274,25 @@ let literalP list =
     ; empty_list
     ; list
     ]
+
+and list () =
+  let exp = pure () >>= exp in
+  let* _ = token lbra in
+  let* e = token exp in
+  let* es = many (token semicol *> token exp) in
+  let* _ = optional @@ token semicol in
+  let* _ = token rbra in
+  match es with
+  | [] -> pure @@ Cons (e, Empty)
+  | _ ->
+    let es = e :: es in
+    let r = List.fold_right (fun e acc -> Cons (e, acc)) es Empty in
+    pure r
 ;;
-
-let list =
-  fix (fun list ->
-      let literalP = literalP list in
-      let pattern_inner = pattern_inner literalP in
-      let pattern = pattern pattern_inner in
-      let cases = cases pattern literalP in
-      let priexp = priexp cases literalP in
-      let exp = exp_from priexp cases in
-      let* _ = token lbra in
-      let* e = token exp in
-      let* es = many (token semicol *> token exp) in
-      let* _ = optional @@ token semicol in
-      let* _ = token rbra in
-      match es with
-      | [] -> pure @@ Cons (e, Empty)
-      | _ ->
-        let es = e :: es in
-        let r = List.fold_right (fun e acc -> Cons (e, acc)) es Empty in
-        pure r)
-;;
-
-(* fix *)
-
-let literalP = literalP list
-let pattern_inner = pattern_inner literalP
-let pattern = pattern pattern_inner
-let cases = cases pattern literalP
-let priexp = priexp cases literalP
-let infix4 = infix4 priexp
-let infix3 = infix3 infix4
-let infix2 = infix2 infix3
-let infix1 = infix1 infix2
-let infix0 = infix0 infix1
-let prefix = prefix infix0
-let exp = exp prefix cases
 
 (* grammer *)
 
+let exp = exp ()
+let pattern = pattern ()
+let cases = cases ()
 let main = wss *> token exp <* eof ()
