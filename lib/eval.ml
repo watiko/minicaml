@@ -2,7 +2,7 @@ open Syntax
 
 type env = Syntax.env
 
-let emptyenv () = ([] : env)
+let emptyenv () : env = []
 let ext (env : env) x v = (x, v) :: env
 
 let defaultenv () =
