@@ -83,6 +83,35 @@ let test_if () =
     table
 ;;
 
+let test_fun () =
+  let open Type in
+  let etenv = defaultenv () in
+  let tenv = etenv in
+  let tenv = ext tenv "print" @@ TArrow (TString, TUnit) in
+  let table =
+    [ {|print "hello"|}, Some TUnit, tenv
+    ; "fun x -> if true then x else 100", Some (TArrow (TInt, TInt)), ext etenv "x" TInt
+    ; "fun x -> if true then x else 100", None, ext (defaultenv ()) "x" TBool
+    ; ( "(fun x -> if true then x else 100) (if true then y else 200)"
+      , Some TInt
+      , ext (ext etenv "x" TInt) "y" TInt )
+    ; ( "fun f -> (fun x -> f (f (f x + 10)))"
+      , Some (TArrow (TArrow (TInt, TInt), TArrow (TInt, TInt)))
+      , let tenv = ext etenv "f" @@ TArrow (TInt, TInt) in
+        let tenv = ext tenv "x" @@ TInt in
+        tenv )
+    ]
+  in
+  List.iter
+    (fun (exp, t, tenv) ->
+      let got =
+        try Some (check (parse exp) tenv) with
+        | _ -> None
+      in
+      Alcotest.(check (option type_testable)) exp t got)
+    table
+;;
+
 let () =
   Alcotest.run
     "Type"
@@ -91,6 +120,7 @@ let () =
         ; Alcotest.test_case "literals" `Quick test_literals
         ; Alcotest.test_case "int_binop" `Quick test_int_binop
         ; Alcotest.test_case "if" `Quick test_if
+        ; Alcotest.test_case "fun" `Quick test_fun
         ] )
     ]
 ;;
