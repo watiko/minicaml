@@ -2,6 +2,13 @@ open Syntax
 
 type env = Syntax.env
 
+let unsafeParse s =
+  let result = Parser.(parse main (explode s)) in
+  match result with
+  | Some exp -> exp
+  | None -> failwith @@ "parse error: " ^ s
+;;
+
 let emptyenv () : env = []
 let ext (env : env) x v = (x, v) :: env
 

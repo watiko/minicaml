@@ -3,13 +3,7 @@ module Syntax = Minicaml.Syntax
 module Eval = Minicaml.Eval
 
 let value_testable = Alcotest.testable Syntax.pprint_value ( = )
-
-let parse s =
-  let result = Parser.(parse main (explode s)) in
-  match result with
-  | Some exp -> exp
-  | None -> failwith @@ "parse error: " ^ s
-;;
+let parse = Eval.unsafeParse
 
 let test_plus () =
   let open Syntax in
