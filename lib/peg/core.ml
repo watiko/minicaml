@@ -115,7 +115,10 @@ let%test _ =
 ;;
 
 let%test _ =
-  let p = item >>= fun c1 -> item >>= fun c2 -> pure (implode [ c1; c2 ]) in
+  let p =
+    item >>= fun c1 ->
+    item >>= fun c2 -> pure (implode [ c1; c2 ])
+  in
   Some ("ab", [ 'c' ]) = p @@ explode "abc"
 ;;
 
