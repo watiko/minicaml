@@ -69,6 +69,10 @@ let rec check e tenv =
     | TArrow (from_t, to_t) ->
       if arg_t = from_t then to_t else failwith "app: arg type mismatch"
     | _ -> failwith "app: fun type required")
+  | Let (x, e1, e2) ->
+    let t1 = check e1 tenv in
+    let tenv = ext tenv x t1 in
+    check e2 tenv
   | _ -> failwith @@ "unknown type: " ^ exp_name e
 
 and binop ename e1 e2 retType tenv =

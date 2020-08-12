@@ -112,6 +112,22 @@ let test_fun () =
     table
 ;;
 
+let test_let () =
+  let open Type in
+  let etenv = defaultenv () in
+  let tenv = etenv in
+  let table = [ "let x = 1 in x", Some TInt, tenv
+                [@ocamlformat "disable"] ] in
+  List.iter
+    (fun (exp, t, tenv) ->
+      let got =
+        try Some (check (parse exp) tenv) with
+        | _ -> None
+      in
+      Alcotest.(check (option type_testable)) exp t got)
+    table
+;;
+
 let () =
   Alcotest.run
     "Type"
@@ -121,6 +137,7 @@ let () =
         ; Alcotest.test_case "int_binop" `Quick test_int_binop
         ; Alcotest.test_case "if" `Quick test_if
         ; Alcotest.test_case "fun" `Quick test_fun
+        ; Alcotest.test_case "let" `Quick test_let
         ] )
     ]
 ;;
