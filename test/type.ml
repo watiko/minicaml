@@ -6,6 +6,24 @@ module Type = Minicaml.Type
 let type_testable = Alcotest.testable Type.pprint_type ( = )
 let parse = Eval.unsafeParse
 
+let test_var () =
+  let open Type in
+  let tenv = defaultenv () in
+  let tenv = ext tenv "x" TInt in
+  let tenv = ext tenv "y" TBool in
+  let tenv = ext tenv "z" TString in
+  let tenv = ext tenv "x" TUnit in
+  let table =
+    [ "x", TUnit, tenv
+    ; "y", TBool, tenv
+    ; "z", TString, tenv
+    ] [@ocamlformat "disable"]
+  in
+  List.iter
+    (fun (exp, t, tenv) -> Alcotest.(check type_testable) exp t (check (parse exp) tenv))
+    table
+;;
+
 let test_literals () =
   let open Type in
   let table =
@@ -16,7 +34,8 @@ let test_literals () =
     ] [@ocamlformat "disable"]
   in
   List.iter
-    (fun (exp, t) -> Alcotest.(check type_testable) exp t (check (parse exp)))
+    (fun (exp, t) ->
+      Alcotest.(check type_testable) exp t (check (parse exp) @@ defaultenv ()))
     table
 ;;
 
@@ -33,7 +52,8 @@ let test_int_binop () =
     ]
   in
   List.iter
-    (fun (exp, t) -> Alcotest.(check type_testable) exp t (check (parse exp)))
+    (fun (exp, t) ->
+      Alcotest.(check type_testable) exp t (check (parse exp) @@ defaultenv ()))
     table
 ;;
 
@@ -56,7 +76,7 @@ let test_if () =
   List.iter
     (fun (exp, t) ->
       let got =
-        try Some (check (parse exp)) with
+        try Some (check (parse exp) @@ defaultenv ()) with
         | _ -> None
       in
       Alcotest.(check (option type_testable)) exp t got)
@@ -67,7 +87,8 @@ let () =
   Alcotest.run
     "Type"
     [ ( "check"
-      , [ Alcotest.test_case "literals" `Quick test_literals
+      , [ Alcotest.test_case "var" `Quick test_var
+        ; Alcotest.test_case "literals" `Quick test_literals
         ; Alcotest.test_case "int_binop" `Quick test_int_binop
         ; Alcotest.test_case "if" `Quick test_if
         ] )

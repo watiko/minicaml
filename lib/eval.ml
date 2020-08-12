@@ -10,7 +10,7 @@ let unsafeParse s =
 ;;
 
 let emptyenv () : env = []
-let ext (env : env) x v = (x, v) :: env
+let ext env x v = (x, v) :: env
 
 let defaultenv () =
   let hdExp =
