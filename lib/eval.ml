@@ -13,10 +13,24 @@ let emptyenv () : env = []
 let ext (env : env) x v = (x, v) :: env
 
 let defaultenv () =
-  let eenv = emptyenv () in
-  let env = eenv in
-  let env = ext env "List.hd" (FunVal ("l", Head (Var "l"), eenv)) in
-  let env = ext env "List.tl" (FunVal ("l", Tail (Var "l"), eenv)) in
+  let hdExp =
+    unsafeParse {|
+    match l with
+    | h :: _ -> h
+    | _ -> failwith "hd"
+  |}
+  in
+  let tlExp =
+    unsafeParse {|
+    match l with
+    | _ :: tl -> tl
+    | _ -> failwith "tl"
+  |}
+  in
+  let env = emptyenv () in
+  let env = ext env "failwith" (FunVal ("s", FailWith (Var "s"), env)) in
+  let env = ext env "List.hd" (FunVal ("l", hdExp, env)) in
+  let env = ext env "List.tl" (FunVal ("l", tlExp, env)) in
   env
 ;;
 
@@ -97,14 +111,10 @@ let rec eval e env =
       ^ value_type v1
       ^ ", "
       ^ value_type v2)
-  | Head e1 ->
-    (match eval e1 env with
-    | ListVal v1 -> List.hd v1
-    | v -> failwith @@ "hd: required list type but got: " ^ value_type v)
-  | Tail e1 ->
-    (match eval e1 env with
-    | ListVal v1 -> ListVal (List.tl v1)
-    | v -> failwith @@ "tl: required list type but got: " ^ value_type v)
+  | FailWith e ->
+    (match eval e env with
+    | StrVal s -> failwith s
+    | v -> failwith @@ "failwith: required str type but got: " ^ value_type v)
   | Match (e1, cases) ->
     let v1 = eval e1 env in
     let rec findMatch cases =

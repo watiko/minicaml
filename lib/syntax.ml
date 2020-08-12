@@ -19,8 +19,7 @@ type exp =
   | Empty (* [] *)
   | Unit (* () *)
   | Cons of exp * exp
-  | Head of exp
-  | Tail of exp
+  | FailWith of exp
 
 type value =
   | UnitVal
@@ -54,8 +53,7 @@ let exp_name = function
   | Empty -> "Empty"
   | Unit -> "Unit"
   | Cons _ -> "Cons"
-  | Head _ -> "Head"
-  | Tail _ -> "Tail"
+  | FailWith _ -> "FailWith"
 ;;
 
 let value_type = function
@@ -75,8 +73,8 @@ let rec pprint_exp ppf e =
   | Var x -> Fmt.pf ppf "%s %s" ename x
   | IntLit n -> Fmt.pf ppf "%s %d" ename n
   | BoolLit b -> Fmt.pf ppf "%s %b" ename b
-  | Head e | Tail e -> Fmt.pf ppf "@[<v 2>%s@ %a]" ename pprint_exp e
   | StrLit s -> Fmt.pf ppf "%s %s" ename s
+  | FailWith e -> Fmt.pf ppf "@[<v 2>%s@ %a]" ename pprint_exp e
   | App (e1, e2)
   | Eq (e1, e2)
   | Greater (e1, e2)
