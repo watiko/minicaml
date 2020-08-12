@@ -241,12 +241,12 @@ let () =
         ; Alcotest.test_case "math" `Quick test_math
         ; Alcotest.test_case "eq" `Quick test_eq
         ; Alcotest.test_case "cmp" `Quick test_cmp
-        ; Alcotest.test_case "env" `Quick test_env
         ; Alcotest.test_case "let" `Quick test_let
         ; Alcotest.test_case "func" `Quick test_func
         ; Alcotest.test_case "letrec" `Quick test_letrec
         ; Alcotest.test_case "list" `Quick test_list
         ; Alcotest.test_case "match" `Quick test_match
         ] )
+    ; "env", [ Alcotest.test_case "env" `Quick test_env ]
     ]
 ;;
