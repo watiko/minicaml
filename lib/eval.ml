@@ -44,6 +44,7 @@ let rec eval e env =
     | None -> failwith @@ "lookup failed with key: " ^ x)
   | IntLit n -> IntVal n
   | BoolLit b -> BoolVal b
+  | StrLit s -> StrVal s
   | Fun (x, e1) -> FunVal (x, e1, env)
   | App (e1, e2) ->
     let fn = eval e1 env in

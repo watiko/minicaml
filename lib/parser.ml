@@ -27,6 +27,29 @@ module Token = struct
     | Slash
 end
 
+let escape =
+  let* _ = char '\\' in
+  let* escaped =
+    choice
+      [ char '\\'
+      ; char '"'
+      ; char '\''
+      ; char 'n' *> pure '\n'
+      ; char 't' *> pure '\t'
+      ; char 'r' *> pure '\r'
+      ]
+  in
+  pure @@ Peg.Utils.implode [ escaped ]
+;;
+
+let regularchar =
+  let c =
+    let* c = notP (choice [ char '\\'; char '"'; char '\''; char '\n' ]) *> item in
+    pure @@ Peg.Utils.implode [ c ]
+  in
+  escape <|> c
+;;
+
 let idP =
   let* d = letter <|> char '_' in
   let* ds = many (alnum <|> char '.' <|> char '_' <|> char '\'') in
@@ -120,6 +143,11 @@ let int =
 
 let empty_list = lbra *> wss *> rbra *> pure Empty
 let unitP = lparen *> wss *> rparen *> pure Unit
+
+let stringLit =
+  let* ss = string "\"" *> many (regularchar <|> string "'") <* string "\"" in
+  pure @@ String.concat "" ss
+;;
 
 (* parser *)
 
@@ -270,6 +298,7 @@ and literalP () =
     [ (fun v -> Var v) <$> var
     ; (fun i -> IntLit i) <$> int
     ; (fun b -> BoolLit b) <$> bool
+    ; (fun s -> StrLit s) <$> stringLit
     ; unitP
     ; empty_list
     ; list

@@ -2,6 +2,7 @@ type exp =
   | Var of string
   | IntLit of int
   | BoolLit of bool
+  | StrLit of string
   | Fun of string * exp
   | App of exp * exp
   | Let of string * exp * exp
@@ -25,6 +26,7 @@ type value =
   | UnitVal
   | IntVal of int
   | BoolVal of bool
+  | StrVal of string
   | ListVal of value list
   | FunVal of string * exp * env
   | RecFunVal of string * string * exp * env
@@ -35,6 +37,7 @@ let exp_name = function
   | Var _ -> "Var"
   | IntLit _ -> "IntLit"
   | BoolLit _ -> "BoolLit"
+  | StrLit _ -> "StrLit"
   | Fun _ -> "Fun"
   | App _ -> "App"
   | Let _ -> "Let"
@@ -59,6 +62,7 @@ let value_type = function
   | UnitVal -> "unit"
   | IntVal _ -> "int"
   | BoolVal _ -> "bool"
+  | StrVal _ -> "str"
   | ListVal _ -> "list"
   | FunVal _ -> "fun"
   | RecFunVal _ -> "fun"
@@ -72,6 +76,7 @@ let rec pprint_exp ppf e =
   | IntLit n -> Fmt.pf ppf "%s %d" ename n
   | BoolLit b -> Fmt.pf ppf "%s %b" ename b
   | Head e | Tail e -> Fmt.pf ppf "@[<v 2>%s@ %a]" ename pprint_exp e
+  | StrLit s -> Fmt.pf ppf "%s %s" ename s
   | App (e1, e2)
   | Eq (e1, e2)
   | Greater (e1, e2)
@@ -99,6 +104,7 @@ let rec pprint_value ppf = function
   | UnitVal -> Fmt.pf ppf "UnitVal"
   | IntVal n -> Fmt.pf ppf "IntVal %d" n
   | BoolVal b -> Fmt.pf ppf "BoolVal %b" b
+  | StrVal s -> Fmt.pf ppf "BoolVal %s" s
   | ListVal l -> Fmt.pf ppf "@[<v 2>ListVal@ %a@]" (Fmt.list pprint_value) l
   | FunVal (n, e, env) ->
     Fmt.pf ppf "@[<v 2>FunVal@ %s@ %a@ %a@]" n pprint_exp e pprint_env env

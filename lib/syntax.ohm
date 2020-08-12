@@ -63,6 +63,7 @@ MiniCaml {
   bool = true | false
   Unit = lparen rparen 
   EmptyList = lbra rbra
+  string = "\"" (regularchar | "\'")* "\""
 
   id = (letter | "_") ( alnum | "." | "_" | "'")*
 
@@ -118,6 +119,12 @@ MiniCaml {
   else  = "else"  ~id
   match = "match" ~id
   with  = "with"  ~id
+
+  escape = "\\" ("\\" | "\"" | "'" | "n" | "t" | "r")
+
+  regularchar =
+    | escape
+    | ~("\\" | "\"" | "'" | "\n") any
 
   // control
   eof = end

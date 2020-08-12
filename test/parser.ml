@@ -11,21 +11,25 @@ let exp_test name expected input =
 let test_tokens () =
   let open Parser in
   let open Syntax in
-  Alcotest.(check (option string))
-    "not_keyword"
-    (Some "inner")
-    (parse var (explode "inner"));
-  Alcotest.(check (option string))
-    "var(complex)"
-    (Some "a_a'0a")
-    (parse var (explode "a_a'0a"));
-  Alcotest.(check (option string)) "var(_)" (Some "_") (parse var (explode "_"));
+  let table =
+    [ "not_keyword", var, Some "inner", "inner"
+    ; "var(complex)", var, Some "a_a'0a", "a_a'0a"
+    ; "var(_)", var, Some "_", "_"
+    ; "empty_string", stringLit, Some "", {|""|}
+    ; "string", stringLit, Some "111", {|"111"|}
+    ; "string_with_escape", stringLit, Some "aaaabb'\"\n", {|"aaaabb'\"\n"|}
+    ]
+  in
+  List.iter
+    (fun (name, parser, want, input) ->
+      Alcotest.(check (option string)) name want (parse parser (explode input)))
+    table;
   Alcotest.(check (option int)) "int(plus)" (Some 123) (parse int (explode "123"));
+  Alcotest.(check (option int)) "int(minus)" (Some (-123)) (parse int (explode "-123"));
   Alcotest.(check (option exp_testable))
     "empty_list"
     (Some Empty)
-    (parse empty_list (explode "[ \n ]"));
-  Alcotest.(check (option int)) "int(minus)" (Some (-123)) (parse int (explode "-123"))
+    (parse empty_list (explode "[ \n ]"))
 ;;
 
 let test_pattern () =
