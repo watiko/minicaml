@@ -1,24 +1,113 @@
 open Syntax
 
+type tyvar = string
+
 type ty =
   | TInt
   | TBool
   | TString
   | TUnit
   | TArrow of ty * ty
-  | TVar of string
+  | TVar of tyvar
 
-let new_typevar s = TVar ("'" ^ s)
+let new_typevar n = TVar ("'a" ^ string_of_int n), n + 1
 
 type tyenv = (string * ty) list
+type tysubst = (tyvar * ty) list
 
 let emptytenv () : tyenv = []
 let lookup = Eval.lookup
 let ext = Eval.ext
+let remove tenv x = List.filter (fun (x', _) -> not (x = x')) tenv
 let defaultenv = emptytenv
+let esubst : tysubst = []
 
 let substitute tvar t tenv =
   List.map (fun (x, t') -> if t' = tvar then x, t else x, t') tenv
+;;
+
+let occurs tx t =
+  let rec occurs tx t k =
+    if tx = t
+    then k true
+    else (
+      match t with
+      | TArrow (t1, t2) ->
+        occurs tx t1 (fun r1 ->
+        occurs tx t2 (fun r2 ->
+        k (r1 || r2))) [@ocamlformat "disable"]
+      | _ -> k false)
+  in
+  occurs tx t (fun x -> x)
+;;
+
+let%test "occurs" = occurs TInt (TArrow (TInt, TBool))
+
+let rec subst_ty subst t =
+  match t with
+  | TInt -> TInt
+  | TBool -> TBool
+  | TString -> TString
+  | TUnit -> TUnit
+  | TArrow (from_t, to_t) -> TArrow (subst_ty subst from_t, subst_ty subst to_t)
+  | TVar x ->
+    (match lookup x subst with
+    | None -> TVar x
+    | Some t -> t)
+;;
+
+let%test "subst_ty: simple" =
+  let subst = emptytenv () in
+  let subst = ext subst "x" TInt in
+  subst_ty subst (TVar "x") = TInt
+;;
+
+let%test "subst_ty: complex" =
+  let subst = emptytenv () in
+  let subst = ext subst "x" TInt in
+  let subst = ext subst "y" TBool in
+  subst_ty subst (TArrow (TVar "x", TVar "y")) = TArrow (TInt, TBool)
+;;
+
+let subst_tyenv subst tenv = List.map (fun (x, t) -> x, subst_ty subst t) tenv
+
+let subst_eql subst eql =
+  List.map (fun (t1, t2) -> subst_ty subst t1, subst_ty subst t2) eql
+;;
+
+let compose_subst subst2 subst1 =
+  let subst1' = List.map (fun (tx, t) -> tx, subst_ty subst2 t) subst1 in
+  List.fold_left
+    (fun subst (x, t) ->
+      match lookup x subst1 with
+      | Some _ -> subst
+      | None -> (x, t) :: subst)
+    subst1'
+    subst2
+;;
+
+let unify eql =
+  let rec solve eql subst =
+    match eql with
+    | [] -> Some subst
+    | (t1, t2) :: eql ->
+      if t1 = t2
+      then solve eql subst
+      else (
+        match t1, t2 with
+        | TArrow (from1, to1), TArrow (from2, to2) ->
+          solve ((from1, from2) :: (to1, to2) :: eql) subst
+        | TVar x, _ -> sub x t2 eql subst
+        | _, TVar x -> sub x t1 eql subst
+        | _, _ -> None)
+  and sub x t eql subst =
+    if occurs (TVar x) t
+    then None
+    else solve (subst_eql [ x, t ] eql) (compose_subst [ x, t ] subst)
+  in
+  match solve eql [] with
+  | None -> failwith "unify: failed"
+  | Some subst -> subst
 ;;
 
 let type_name = function
@@ -39,73 +128,82 @@ let rec pprint_type ppf t =
   | TVar x -> Fmt.pf ppf "@[<v 2>%s@ %s@]" tname x
 ;;
 
-let rec infer tenv e =
+let rec infer tenv e n =
   let ename = exp_name e in
   match e with
   | Var x ->
     (match lookup x tenv with
-    | Some t -> tenv, t
+    | Some t -> tenv, t, esubst, n
     | None ->
-      let tvar = new_typevar x in
+      let tvar, n = new_typevar n in
       let tenv = ext tenv x tvar in
-      tenv, tvar)
-  | Unit -> tenv, TUnit
-  | IntLit _ -> tenv, TInt
-  | BoolLit _ -> tenv, TBool
-  | StrLit _ -> tenv, TString
+      tenv, tvar, esubst, n)
+  | Unit -> tenv, TUnit, esubst, n
+  | IntLit _ -> tenv, TInt, esubst, n
+  | BoolLit _ -> tenv, TBool, esubst, n
+  | StrLit _ -> tenv, TString, esubst, n
   | Plus (e1, e2) | Minus (e1, e2) | Times (e1, e2) | Div (e1, e2) ->
-    binop_infer tenv e1 e2 ename TInt
-  | Greater (e1, e2) | Less (e1, e2) -> binop_infer tenv e1 e2 ename TBool
-  | Eq (e1, e2) ->
-    let eqable t = List.mem t [ TUnit; TInt; TBool; TString ] in
-    let tenv, t1 = infer tenv e1 in
-    let tenv, t2 = infer tenv e2 in
-    let tenv =
-      match t1, t2 with
-      | _, _ when t1 = t2 && eqable t1 -> tenv
-      | TVar _, TVar _ ->
-        let tenv = substitute t1 t2 tenv in
-        tenv
-      | _, TVar _ when eqable t1 ->
-        let tenv = substitute t2 t1 tenv in
-        tenv
-      | TVar _, _ when eqable t2 ->
-        let tenv = substitute t1 t2 tenv in
-        tenv
-      | _ -> failwith "eq: type mismatch"
-    in
-    tenv, TBool
-  | If (c, e1, e2) ->
-    let tenv, ct = infer tenv c in
-    let tenv = require tenv ct ename TBool in
-    let tenv, t1 = infer tenv e1 in
-    let tenv, t2 = infer tenv e2 in
-    (match t1, t2 with
-    | _, _ when t1 = t2 -> tenv, t1
-    | TVar _, TVar _ ->
-      let tenv = substitute t1 t2 tenv in
-      tenv, t2
-    | _, TVar _ ->
-      let tenv = substitute t2 t1 tenv in
-      tenv, t1
-    | TVar _, _ ->
-      let tenv = substitute t1 t2 tenv in
-      tenv, t2
-    | _ -> failwith "if: type mismatch")
+    binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TInt
+  | Greater (e1, e2) | Less (e1, e2) ->
+    binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TBool
+  | Eq (e1, e2) -> binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, t2 ]) TBool
+  | If (c, et, ef) ->
+    let tenv, ct, subst, n = infer tenv c n in
+    let subst_c = unify [ ct, TBool ] in
+    let subst = compose_subst subst subst_c in
+    let tenv = subst_tyenv subst tenv in
+    let tenv, tt, subst_t, n = infer tenv et n in
+    let subst = compose_subst subst subst_t in
+    let tenv = subst_tyenv subst tenv in
+    let tenv, tf, subst_f, n = infer tenv ef n in
+    let subst = compose_subst subst subst_f in
+    let tt = subst_ty subst tt in
+    let tf = subst_ty subst tf in
+    let subst_r = unify [ tt, tf ] in
+    let subst = compose_subst subst subst_r in
+    let tt = subst_ty subst tt in
+    tenv, tt, subst, n
+  | Fun (x, e) ->
+    let tvar, n = new_typevar n in
+    let tenv = ext tenv x tvar in
+    let tenv, t, subst, n = infer tenv e n in
+    let tvar = subst_ty subst tvar in
+    let tenv = remove tenv x in
+    tenv, TArrow (tvar, t), subst, n
+  | App (e1, e2) ->
+    let tenv, t1, subst1, n = infer tenv e1 n in
+    let tenv, t2, subst2, n = infer tenv e2 n in
+    let tvar, n = new_typevar n in
+    let t1 = subst_ty subst2 t1 in
+    let subst3 = unify [ t1, TArrow (t2, tvar) ] in
+    let tvar = subst_ty subst3 tvar in
+    let tenv = subst_tyenv subst3 tenv in
+    let subst4 = compose_subst subst1 subst2 in
+    let subst4 = compose_subst subst3 subst4 in
+    tenv, tvar, subst4, n
+  | Let (x, e1, e2) ->
+    let tenv, t1, subst1, n = infer tenv e1 n in
+    let tenv = ext tenv x t1 in
+    let tenv, t2, subst2, n = infer tenv e2 n in
+    let subst = compose_subst subst1 subst2 in
+    let t2 = subst_ty subst t2 in
+    tenv, t2, subst, n
   | _ -> failwith @@ "infer: not implemented: " ^ ename
 
-and require tenv t ename wantType =
-  match t with
-  | TVar _ as tvar -> substitute tvar wantType tenv
-  | _ when t = wantType -> tenv
-  | _ -> failwith @@ "type error: " ^ ename
+and binop_infer tenv e1 e2 n cmp retType =
+  let tenv, t1, subst1, n = infer tenv e1 n in
+  let tenv, t2, subst2, n = infer tenv e2 n in
+  let t1 = subst_ty subst2 t1 in
+  let subst3 = unify (cmp (t1, t2)) in
+  let tenv = subst_tyenv subst3 tenv in
+  let subst4 = compose_subst subst1 subst2 in
+  let subst4 = compose_subst subst3 subst4 in
+  tenv, retType, subst4, n
+;;
 
-and binop_infer tenv e1 e2 ename retType =
-  let tenv, t1 = infer tenv e1 in
-  let tenv = require tenv t1 ename TInt in
-  let tenv, t2 = infer tenv e2 in
-  let tenv = require tenv t2 ename TInt in
-  tenv, retType
+let infer tenv e =
+  let tenv, t, _, _ = infer tenv e 0 in
+  tenv, t
 ;;
 
 let rec check e tenv =

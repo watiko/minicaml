@@ -113,7 +113,8 @@ let test_if kind () =
         in
         Alcotest.(check (option type_testable)) exp t got)
       table
-  else
+  else (
+    let table = List.concat [ table; [ "if true then x else 100", Some TInt ] ] in
     List.iter
       (fun (exp, t) ->
         let got =
@@ -124,18 +125,19 @@ let test_if kind () =
           | _ -> None
         in
         Alcotest.(check (option type_testable)) exp t got)
-      table
+      table)
 ;;
 
-let test_fun () =
+let test_fun kind () =
   let open Type in
   let etenv = defaultenv () in
   let tenv = etenv in
   let tenv = ext tenv "print" @@ TArrow (TString, TUnit) in
   let table =
     [ {|print "hello"|}, Some TUnit, tenv
-    ; "fun x -> if true then x else 100", Some (TArrow (TInt, TInt)), ext etenv "x" TInt
-    ; "fun x -> if true then x else 100", None, ext (defaultenv ()) "x" TBool
+    ; ( "fun x -> if true then x else 100"
+      , Some (TArrow (TInt, TInt))
+      , if kind = Check then ext etenv "x" TInt else etenv )
     ; ( "(fun x -> if true then x else 100) (if true then y else 200)"
       , Some TInt
       , ext (ext etenv "x" TInt) "y" TInt )
@@ -146,30 +148,65 @@ let test_fun () =
         tenv )
     ]
   in
-  List.iter
-    (fun (exp, t, tenv) ->
-      let got =
-        try Some (check (parse exp) tenv) with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  if kind = Check
+  then
+    List.iter
+      (fun (exp, t, tenv) ->
+        let got =
+          try Some (check (parse exp) tenv) with
+          | _ -> None
+        in
+        Alcotest.(check (option type_testable)) exp t got)
+      table
+  else (
+    let table =
+      List.concat
+        [ table
+        ; [ "(fun x -> x) true", Some TBool, defaultenv ()
+          ; "(fun x -> x + 1)", Some (TArrow (TInt, TInt)), defaultenv ()
+          ]
+        ]
+    in
+    List.iter
+      (fun (exp, t, tenv) ->
+        let got =
+          try
+            let _, got = infer tenv (parse exp) in
+            Some got
+          with
+          | _ -> None
+        in
+        Alcotest.(check (option type_testable)) exp t got)
+      table)
 ;;
 
-let test_let () =
+let test_let kind () =
   let open Type in
   let etenv = defaultenv () in
   let tenv = etenv in
-  let table = [ "let x = 1 in x", Some TInt, tenv
-                [@ocamlformat "disable"] ] in
-  List.iter
-    (fun (exp, t, tenv) ->
-      let got =
-        try Some (check (parse exp) tenv) with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  let table = [ "let x = 1 in x", Some TInt, tenv ] in
+  if kind = Check
+  then
+    List.iter
+      (fun (exp, t, tenv) ->
+        let got =
+          try Some (check (parse exp) tenv) with
+          | _ -> None
+        in
+        Alcotest.(check (option type_testable)) exp t got)
+      table
+  else
+    List.iter
+      (fun (exp, t, tenv) ->
+        let got =
+          try
+            let _, got = infer tenv (parse exp) in
+            Some got
+          with
+          | _ -> None
+        in
+        Alcotest.(check (option type_testable)) exp t got)
+      table
 ;;
 
 let () =
@@ -180,16 +217,16 @@ let () =
         ; Alcotest.test_case "literals" `Quick @@ test_literals Check
         ; Alcotest.test_case "int_binop" `Quick @@ test_int_binop Check
         ; Alcotest.test_case "if" `Quick @@ test_if Check
-        ; Alcotest.test_case "fun" `Quick test_fun
-        ; Alcotest.test_case "let" `Quick test_let
+        ; Alcotest.test_case "fun" `Quick @@ test_fun Check
+        ; Alcotest.test_case "let" `Quick @@ test_let Check
         ] )
     ; ( "infer"
       , [ Alcotest.test_case "var" `Quick @@ test_var Infer
         ; Alcotest.test_case "literals" `Quick @@ test_literals Infer
         ; Alcotest.test_case "int_binop" `Quick @@ test_int_binop Infer
         ; Alcotest.test_case "if" `Quick @@ test_if Infer
-        ; Alcotest.test_case "fun" `Quick test_fun
-        ; Alcotest.test_case "let" `Quick test_let
+        ; Alcotest.test_case "fun" `Quick @@ test_fun Infer
+        ; Alcotest.test_case "let" `Quick @@ test_let Infer
         ] )
     ]
 ;;
