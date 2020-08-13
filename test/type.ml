@@ -209,6 +209,36 @@ let test_let kind () =
       table
 ;;
 
+let test_letrec () =
+  let open Type in
+  let table =
+    [ "let rec id x = x in id 1", Some TInt
+    ; "let rec fact n = if n = 0 then 1 else n * fact (n - 1) in fact 5", Some TInt
+    ; ( {|
+      let rec fact n = fun k ->
+        if n = 0 then k 1
+        else fact (n - 1) (fun x ->
+             k (x * n))
+      in fact 5 (fun x -> x)
+      |}
+      , Some TInt )
+    ]
+  in
+  List.iter
+    (fun (exp, t) ->
+      let got =
+        try
+          let _, got = infer (defaultenv ()) (parse exp) in
+          Some got
+        with
+        | e ->
+          print_string (Printexc.to_string e);
+          None
+      in
+      Alcotest.(check (option type_testable)) exp t got)
+    table
+;;
+
 let () =
   Alcotest.run
     "Type"
@@ -227,6 +257,7 @@ let () =
         ; Alcotest.test_case "if" `Quick @@ test_if Infer
         ; Alcotest.test_case "fun" `Quick @@ test_fun Infer
         ; Alcotest.test_case "let" `Quick @@ test_let Infer
+        ; Alcotest.test_case "letrec" `Quick test_letrec
         ] )
     ]
 ;;

@@ -142,6 +142,7 @@ let rec infer tenv e n =
   | IntLit _ -> tenv, TInt, esubst, n
   | BoolLit _ -> tenv, TBool, esubst, n
   | StrLit _ -> tenv, TString, esubst, n
+  | FailWith _ -> tenv, TUnit, esubst, n
   | Plus (e1, e2) | Minus (e1, e2) | Times (e1, e2) | Div (e1, e2) ->
     binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TInt
   | Greater (e1, e2) | Less (e1, e2) ->
@@ -186,6 +187,21 @@ let rec infer tenv e n =
     let tenv = ext tenv x t1 in
     let tenv, t2, subst2, n = infer tenv e2 n in
     let subst = compose_subst subst1 subst2 in
+    let t2 = subst_ty subst t2 in
+    tenv, t2, subst, n
+  | LetRec (f, x, e1, e2) ->
+    let tvar_a, n = new_typevar n in
+    let tvar_r, n = new_typevar n in
+    let tenv = ext tenv x tvar_a in
+    let tenv = ext tenv f @@ TArrow (tvar_a, tvar_r) in
+    let tenv, t1, subst, n = infer tenv e1 n in
+    (* let tvar_a = subst_ty subst tvar_a in *)
+    let tvar_r = subst_ty subst tvar_r in
+    let subst' = unify [ t1, tvar_r ] in
+    let subst = compose_subst subst subst' in
+    let tenv = subst_tyenv subst tenv in
+    let tenv, t2, subst', n = infer tenv e2 n in
+    let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in
     tenv, t2, subst, n
   | _ -> failwith @@ "infer: not implemented: " ^ ename
