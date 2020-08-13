@@ -17,12 +17,8 @@ let lookup = Eval.lookup
 let ext = Eval.ext
 let defaultenv = emptytenv
 
-let rec substitute tvar t tenv =
-  match tenv with
-  | [] -> []
-  | (x, t') :: tenv ->
-    let replaced = if t' = tvar then t else t' in
-    (x, replaced) :: substitute tvar t tenv
+let substitute tvar t tenv =
+  List.map (fun (x, t') -> if t' = tvar then x, t else x, t') tenv
 ;;
 
 let type_name = function
