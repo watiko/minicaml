@@ -237,6 +237,34 @@ let test_letrec () =
     table
 ;;
 
+let test_list () =
+  let open Type in
+  let table =
+    [ "[]", Some (TList (TVar "'a0"))
+    ; "[false]", Some (TList TBool)
+    ; "[1; 2; 3; 4; 5]", Some (TList TInt)
+    ; "let x = 1 in [x]", Some (TList TInt)
+    ; "[1; x]", Some (TList TInt)
+    ; "[1; false]", None
+    ; "[1; false; 1]", None
+    ]
+  in
+  List.iter
+    (fun (exp, t) ->
+      let got =
+        try
+          let _, got = infer (defaultenv ()) (parse exp) in
+          Some got
+        with
+        (* | _ -> None *)
+        | e ->
+          print_string (Printexc.to_string e);
+          None
+      in
+      Alcotest.(check (option type_testable)) exp t got)
+    table
+;;
+
 let () =
   Alcotest.run
     "Type"
@@ -256,6 +284,7 @@ let () =
         ; Alcotest.test_case "fun" `Quick @@ test_fun Infer
         ; Alcotest.test_case "let" `Quick @@ test_let Infer
         ; Alcotest.test_case "letrec" `Quick test_letrec
+        ; Alcotest.test_case "letrec" `Quick test_list
         ] )
     ]
 ;;

@@ -9,6 +9,27 @@ type ty =
   | TUnit
   | TArrow of ty * ty
   | TVar of tyvar
+  | TList of ty
+
+let type_name = function
+  | TInt -> "int"
+  | TBool -> "bool"
+  | TString -> "string"
+  | TUnit -> "unit"
+  | TArrow _ -> "fun"
+  | TVar _ -> "tvar"
+  | TList _ -> "list"
+;;
+
+let rec pprint_type ppf t =
+  let tname = type_name t in
+  match t with
+  | TInt | TBool | TString | TUnit -> Fmt.pf ppf "%s" tname
+  | TArrow (t1, t2) ->
+    Fmt.pf ppf "@[<v 2>%s@ %a->@ %a@]" tname pprint_type t1 pprint_type t2
+  | TVar x -> Fmt.pf ppf "@[<v 2>%s@ %s@]" tname x
+  | TList t -> Fmt.pf ppf "@[<v 2>%s@ %a@]" tname pprint_type t
+;;
 
 let new_typevar n = TVar ("'a" ^ string_of_int n), n + 1
 
@@ -54,6 +75,7 @@ let rec subst_ty subst t =
     (match lookup x subst with
     | None -> TVar x
     | Some t -> t)
+  | TList t -> TList (subst_ty subst t)
 ;;
 
 let%test "subst_ty: simple" =
@@ -89,7 +111,7 @@ let compose_subst subst2 subst1 =
 let unify eql =
   let rec solve eql subst =
     match eql with
-    | [] -> Some subst
+    | [] -> Ok subst
     | (t1, t2) :: eql ->
       if t1 = t2
       then solve eql subst
@@ -97,35 +119,27 @@ let unify eql =
         match t1, t2 with
         | TArrow (from1, to1), TArrow (from2, to2) ->
           solve ((from1, from2) :: (to1, to2) :: eql) subst
+        | TList t1, TList t2 -> solve ((t1, t2) :: eql) subst
         | TVar x, _ -> sub x t2 eql subst
         | _, TVar x -> sub x t1 eql subst
-        | _, _ -> None)
+        | _, _ ->
+          Error
+            (Fmt.strf
+               "@[expected %s but got %s:@ One: %a@ Another: %a@]"
+               (type_name t1)
+               (type_name t2)
+               pprint_type
+               t1
+               pprint_type
+               t2))
   and sub x t eql subst =
     if occurs (TVar x) t
-    then None
+    then Error (Fmt.strf "type %s contains a reference to itself" (type_name t))
     else solve (subst_eql [ x, t ] eql) (compose_subst [ x, t ] subst)
   in
   match solve eql [] with
-  | None -> failwith "unify: failed"
-  | Some subst -> subst
-;;
-
-let type_name = function
-  | TInt -> "int"
-  | TBool -> "bool"
-  | TString -> "string"
-  | TUnit -> "unit"
-  | TArrow _ -> "fun"
-  | TVar _ -> "tvar"
-;;
-
-let rec pprint_type ppf t =
-  let tname = type_name t in
-  match t with
-  | TInt | TBool | TString | TUnit -> Fmt.pf ppf "%s" tname
-  | TArrow (t1, t2) ->
-    Fmt.pf ppf "@[<v 2>%s@ %a->@ %a@]" tname pprint_type t1 pprint_type t2
-  | TVar x -> Fmt.pf ppf "@[<v 2>%s@ %s@]" tname x
+  | Error message -> failwith @@ "unify failed: " ^ message
+  | Ok subst -> subst
 ;;
 
 let rec infer tenv e n =
@@ -203,8 +217,19 @@ let rec infer tenv e n =
     let t2 = subst_ty subst t2 in
     tenv, t2, subst, n
   | Match _ -> failwith "match: not implemented"
-  | Cons _ -> failwith "cons: not implemented"
-  | Empty -> failwith "empty: not implemented"
+  | Empty ->
+    let tvar, n = new_typevar n in
+    tenv, TList tvar, esubst, n
+  | Cons (e1, e2) ->
+    let tenv, t1, subst1, n = infer tenv e1 n in
+    let tenv, t2, subst2, n = infer tenv e2 n in
+    let t1 = subst_ty subst2 t1 in
+    let subst = compose_subst subst1 subst2 in
+    let subst' = unify [ t2, TList t1 ] in
+    let subst = compose_subst subst subst' in
+    let t2 = subst_ty subst t2 in
+    let tenv = subst_tyenv subst tenv in
+    tenv, t2, subst, n
 
 and binop_infer tenv e1 e2 n cmp retType =
   let tenv, t1, subst1, n = infer tenv e1 n in
