@@ -204,7 +204,9 @@ let rec infer tenv e n =
     let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in
     tenv, t2, subst, n
-  | _ -> failwith @@ "infer: not implemented: " ^ ename
+  | Match _ -> failwith "match: not implemented"
+  | Cons _ -> failwith "cons: not implemented"
+  | Empty -> failwith "empty: not implemented"
 
 and binop_infer tenv e1 e2 n cmp retType =
   let tenv, t1, subst1, n = infer tenv e1 n in
@@ -235,6 +237,7 @@ let rec check e tenv =
   | IntLit _ -> TInt
   | BoolLit _ -> TBool
   | StrLit _ -> TString
+  | FailWith _ -> TUnit
   | Plus (e1, e2) | Minus (e1, e2) | Times (e1, e2) | Div (e1, e2) ->
     binop ename e1 e2 TInt tenv
   | Greater (e1, e2) | Less (e1, e2) -> binop ename e1 e2 TBool tenv
@@ -265,7 +268,10 @@ let rec check e tenv =
     let t1 = check e1 tenv in
     let tenv = ext tenv x t1 in
     check e2 tenv
-  | _ -> failwith @@ "unknown type: " ^ exp_name e
+  | LetRec _ -> failwith "letrec: not implemented"
+  | Match _ -> failwith "match: not implemented"
+  | Cons _ -> failwith "cons: not implemented"
+  | Empty -> failwith "empty: not implemented"
 
 and binop ename e1 e2 retType tenv =
   match check e1 tenv, check e2 tenv with
