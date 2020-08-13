@@ -231,9 +231,7 @@ let test_letrec () =
           let _, got = infer (defaultenv ()) (parse exp) in
           Some got
         with
-        | e ->
-          print_string (Printexc.to_string e);
-          None
+        | _ -> None
       in
       Alcotest.(check (option type_testable)) exp t got)
     table
