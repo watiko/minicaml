@@ -129,7 +129,6 @@ let rec pprint_type ppf t =
 ;;
 
 let rec infer tenv e n =
-  let ename = exp_name e in
   match e with
   | Var x ->
     (match lookup x tenv with
@@ -195,7 +194,6 @@ let rec infer tenv e n =
     let tenv = ext tenv x tvar_a in
     let tenv = ext tenv f @@ TArrow (tvar_a, tvar_r) in
     let tenv, t1, subst, n = infer tenv e1 n in
-    (* let tvar_a = subst_ty subst tvar_a in *)
     let tvar_r = subst_ty subst tvar_r in
     let subst' = unify [ t1, tvar_r ] in
     let subst = compose_subst subst subst' in
