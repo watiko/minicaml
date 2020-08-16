@@ -265,6 +265,36 @@ let test_list () =
     table
 ;;
 
+let test_match () =
+  let open Type in
+  let table =
+    [ "match true with x -> x", Some TBool
+    ; "match true with | 1 -> 1 | 2 -> 2", None
+    ; "match x with | 1 -> 1 | 2 -> 2", Some TInt
+    ; "match x with | 1 -> 1 | _ -> y", Some TInt
+    ; "match [] with | [] -> 1 | h :: tl -> h", Some TInt
+    ; "match [1; 2; 3] with | [] -> failwith \"fail\" | h :: _ -> h", Some TInt
+    ; "fun x -> match 1 with x -> x", Some (TArrow (TVar "'a0", TInt))
+    ; "fun x -> match 1 with | x -> x | _ -> x + 10", Some (TArrow (TInt, TInt))
+    ; "match [true; false] with | x :: [] -> x | x -> false", Some TBool
+    ]
+  in
+  List.iter
+    (fun (exp, t) ->
+      let got =
+        try
+          let _, got = infer (defaultenv ()) (parse exp) in
+          Some got
+        with
+        (* | _ -> None *)
+        | e ->
+          print_string (Printexc.to_string e);
+          None
+      in
+      Alcotest.(check (option type_testable)) exp t got)
+    table
+;;
+
 let () =
   Alcotest.run
     "Type"
@@ -284,7 +314,8 @@ let () =
         ; Alcotest.test_case "fun" `Quick @@ test_fun Infer
         ; Alcotest.test_case "let" `Quick @@ test_let Infer
         ; Alcotest.test_case "letrec" `Quick test_letrec
-        ; Alcotest.test_case "letrec" `Quick test_list
+        ; Alcotest.test_case "list" `Quick test_list
+        ; Alcotest.test_case "match" `Quick test_match
         ] )
     ]
 ;;

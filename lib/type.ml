@@ -27,7 +27,7 @@ let rec pprint_type ppf t =
   | TInt | TBool | TString | TUnit -> Fmt.pf ppf "%s" tname
   | TArrow (t1, t2) ->
     Fmt.pf ppf "@[<v 2>%s@ %a->@ %a@]" tname pprint_type t1 pprint_type t2
-  | TVar x -> Fmt.pf ppf "@[<v 2>%s@ %s@]" tname x
+  | TVar x -> Fmt.pf ppf "@[<v 2>%s(%s)@]" tname x
   | TList t -> Fmt.pf ppf "@[<v 2>%s@ %a@]" tname pprint_type t
 ;;
 
@@ -39,7 +39,25 @@ type tysubst = (tyvar * ty) list
 let emptytenv () : tyenv = []
 let lookup = Eval.lookup
 let ext = Eval.ext
-let remove tenv x = List.filter (fun (x', _) -> not (x = x')) tenv
+
+let remove tenv x =
+  let rec remove tenv x k =
+    match tenv with
+    | [] -> k []
+    | (tx, _) :: tenv when tx = x -> k tenv
+    | h :: tenv -> remove tenv x (fun tenv -> k (h :: tenv))
+  in
+  remove tenv x (fun x -> x)
+;;
+
+let%test "remove" =
+  let tenv = emptytenv () in
+  let tenv = ext tenv "x" TInt in
+  let tenv' = ext tenv "y" TInt in
+  let tenv = ext tenv' "x" TBool in
+  remove tenv "x" = tenv'
+;;
+
 let defaultenv = emptytenv
 let esubst : tysubst = []
 
@@ -142,6 +160,24 @@ let unify eql =
   | Ok subst -> subst
 ;;
 
+let freevar e =
+  let rec freevar e k =
+    match e with
+    | Var x ->
+      (match x with
+      | "_" -> k []
+      | x -> k [ x ])
+    | Cons (hd, tl) ->
+      freevar hd (fun vars1 ->
+          freevar tl (fun vars2 -> k @@ List.concat [ vars1; vars2 ]))
+    | Unit | IntLit _ | BoolLit _ | StrLit _ | _ -> k []
+  in
+  freevar e (fun x -> x)
+;;
+
+let%test "freevar" = freevar (Var "x") = [ "x" ]
+let%test "freevar2" = freevar (Cons (Var "x", Cons (Var "y", Empty))) = [ "x"; "y" ]
+
 let rec infer tenv e n =
   match e with
   | Var x ->
@@ -155,7 +191,9 @@ let rec infer tenv e n =
   | IntLit _ -> tenv, TInt, esubst, n
   | BoolLit _ -> tenv, TBool, esubst, n
   | StrLit _ -> tenv, TString, esubst, n
-  | FailWith _ -> tenv, TUnit, esubst, n
+  | FailWith _ ->
+    let tvar, n = new_typevar n in
+    tenv, tvar, esubst, n
   | Plus (e1, e2) | Minus (e1, e2) | Times (e1, e2) | Div (e1, e2) ->
     binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TInt
   | Greater (e1, e2) | Less (e1, e2) ->
@@ -216,7 +254,38 @@ let rec infer tenv e n =
     let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in
     tenv, t2, subst, n
-  | Match _ -> failwith "match: not implemented"
+  | Match (e1, cases) ->
+    let loop (subst1, tenv, n, bt, t1) (p, b) =
+      let vars = freevar p in
+      let tenv, n =
+        List.fold_left
+          (fun (tenv, n) var ->
+            let tvar, n = new_typevar n in
+            let tenv = ext tenv var tvar in
+            tenv, n)
+          (tenv, n)
+          vars
+      in
+      let tenv, pt, subst', n = infer tenv p n in
+      let subst = compose_subst subst1 subst' in
+      let subst' = unify [ t1, pt ] in
+      let subst = compose_subst subst subst' in
+      let tenv = subst_tyenv subst tenv in
+      let tenv, bt', subst_b, n = infer tenv b n in
+      let subst = compose_subst subst subst_b in
+      let subst' = unify [ bt, bt' ] in
+      let subst_b = compose_subst subst_b subst' in
+      let subst = compose_subst subst subst' in
+      let bt = subst_ty subst bt in
+      let tenv = List.fold_left (fun tenv var -> remove tenv var) tenv vars in
+      let subst = compose_subst subst1 subst_b in
+      subst, tenv, n, bt, t1
+    in
+    let tenv, t1, subst1, n = infer tenv e1 n in
+    let bt, n = new_typevar n in
+    let subst, tenv, n, bt, _ = List.fold_left loop (subst1, tenv, n, bt, t1) cases in
+    let tenv = subst_tyenv subst tenv in
+    tenv, bt, subst, n
   | Empty ->
     let tvar, n = new_typevar n in
     tenv, TList tvar, esubst, n
