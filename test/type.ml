@@ -195,7 +195,16 @@ let test_let kind () =
         in
         Alcotest.(check (option type_testable)) exp t got)
       table
-  else
+  else (
+    let table =
+      List.concat
+        [ table
+        ; [ ( "let trueFn = fun x -> true in [trueFn 1; trueFn bool; trueFn ()]"
+            , Some (TList TBool)
+            , defaultenv () )
+          ]
+        ]
+    in
     List.iter
       (fun (exp, t, tenv) ->
         let got =
@@ -206,7 +215,7 @@ let test_let kind () =
           | _ -> None
         in
         Alcotest.(check (option type_testable)) exp t got)
-      table
+      table)
 ;;
 
 let test_letrec () =

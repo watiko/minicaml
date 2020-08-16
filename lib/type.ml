@@ -10,6 +10,7 @@ type ty =
   | TArrow of ty * ty
   | TVar of tyvar
   | TList of ty
+  | TScheme of tyvar list * ty
 
 let type_name = function
   | TInt -> "int"
@@ -19,6 +20,7 @@ let type_name = function
   | TArrow _ -> "fun"
   | TVar _ -> "tvar"
   | TList _ -> "list"
+  | TScheme _ -> "type schema"
 ;;
 
 let rec pprint_type ppf t =
@@ -29,6 +31,15 @@ let rec pprint_type ppf t =
     Fmt.pf ppf "@[<v 2>%s@ %a->@ %a@]" tname pprint_type t1 pprint_type t2
   | TVar x -> Fmt.pf ppf "@[<v 2>%s(%s)@]" tname x
   | TList t -> Fmt.pf ppf "@[<v 2>%s@ %a@]" tname pprint_type t
+  | TScheme (tyvars, t) ->
+    Fmt.pf
+      ppf
+      "@[<v 2>%s: forall %a.@ %a@]"
+      tname
+      (Fmt.list Fmt.string)
+      tyvars
+      pprint_type
+      t
 ;;
 
 let new_typevar n = TVar ("'a" ^ string_of_int n), n + 1
@@ -94,6 +105,7 @@ let rec subst_ty subst t =
     | None -> TVar x
     | Some t -> t)
   | TList t -> TList (subst_ty subst t)
+  | TScheme _ as t -> t
 ;;
 
 let%test "subst_ty: simple" =
@@ -178,10 +190,49 @@ let freevar e =
 let%test "freevar" = freevar (Var "x") = [ "x" ]
 let%test "freevar2" = freevar (Cons (Var "x", Cons (Var "y", Empty))) = [ "x"; "y" ]
 
+let list_diff l1 l2 =
+  let module SS = Set.Make (String) in
+  let s1 = SS.of_list l1 in
+  let s2 = SS.of_list l2 in
+  let ret = SS.diff s1 s2 in
+  SS.elements ret
+;;
+
+let rec freetyvar_ty t =
+  match t with
+  | TInt | TBool | TString | TUnit -> []
+  | TArrow (t1, t2) -> List.concat @@ List.map freetyvar_ty [ t1; t2 ]
+  | TVar x -> [ x ]
+  | TList t -> freetyvar_ty t
+  | TScheme (tyvars, t) -> list_diff (freetyvar_ty t) tyvars
+;;
+
+let rec freetyvar_tyenv tenv =
+  match tenv with
+  | [] -> []
+  | (_, t) :: tenv -> List.concat @@ [ freetyvar_ty t; freetyvar_tyenv tenv ]
+;;
+
+let closure t tenv =
+  let tvars = list_diff (freetyvar_ty t) (freetyvar_tyenv tenv) in
+  TScheme (tvars, t)
+;;
+
 let rec infer tenv e n =
   match e with
   | Var x ->
     (match lookup x tenv with
+    | Some (TScheme (tvars, t)) ->
+      let n, subst =
+        List.fold_left
+          (fun (n, subst) tvar ->
+            let newtvar, n = new_typevar n in
+            let subst = compose_subst subst [ tvar, newtvar ] in
+            n, subst)
+          (n, esubst)
+          tvars
+      in
+      tenv, t, subst, n
     | Some t -> tenv, t, esubst, n
     | None ->
       let tvar, n = new_typevar n in
@@ -235,6 +286,7 @@ let rec infer tenv e n =
     tenv, tvar, subst4, n
   | Let (x, e1, e2) ->
     let tenv, t1, subst1, n = infer tenv e1 n in
+    let t1 = closure t1 tenv in
     let tenv = ext tenv x t1 in
     let tenv, t2, subst2, n = infer tenv e2 n in
     let subst = compose_subst subst1 subst2 in
