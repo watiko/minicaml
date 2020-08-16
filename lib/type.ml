@@ -36,7 +36,7 @@ let rec pprint_type ppf t =
       ppf
       "@[<v 2>%s: forall %a.@ %a@]"
       tname
-      (Fmt.list Fmt.string)
+      (Fmt.list ~sep:Fmt.comma Fmt.string)
       tyvars
       pprint_type
       t
@@ -201,7 +201,7 @@ let list_diff l1 l2 =
 let rec freetyvar_ty t =
   match t with
   | TInt | TBool | TString | TUnit -> []
-  | TArrow (t1, t2) -> List.concat @@ List.map freetyvar_ty [ t1; t2 ]
+  | TArrow (t1, t2) -> List.concat [ freetyvar_ty t1; freetyvar_ty t2 ]
   | TVar x -> [ x ]
   | TList t -> freetyvar_ty t
   | TScheme (tyvars, t) -> list_diff (freetyvar_ty t) tyvars
@@ -232,6 +232,7 @@ let rec infer tenv e n =
           (n, esubst)
           tvars
       in
+      let t = subst_ty subst t in
       tenv, t, subst, n
     | Some t -> tenv, t, esubst, n
     | None ->
@@ -293,15 +294,22 @@ let rec infer tenv e n =
     let t2 = subst_ty subst t2 in
     tenv, t2, subst, n
   | LetRec (f, x, e1, e2) ->
-    let tvar_a, n = new_typevar n in
-    let tvar_r, n = new_typevar n in
-    let tenv = ext tenv x tvar_a in
-    let tenv = ext tenv f @@ TArrow (tvar_a, tvar_r) in
+    let tvar_fn, n = new_typevar n in
+    let tvar_arg, n = new_typevar n in
+    let tenv = ext tenv f tvar_fn in
+    let tenv = ext tenv x tvar_arg in
     let tenv, t1, subst, n = infer tenv e1 n in
-    let tvar_r = subst_ty subst tvar_r in
-    let subst' = unify [ t1, tvar_r ] in
+    (* todo: simplify subst *)
+    let tvar_fn = subst_ty subst tvar_fn in
+    let tvar_fn = subst_ty subst tvar_fn in
+    let tvar_arg = subst_ty subst tvar_arg in
+    let subst' = unify [ tvar_fn, TArrow (tvar_arg, t1) ] in
     let subst = compose_subst subst subst' in
     let tenv = subst_tyenv subst tenv in
+    let tvar_fn = subst_ty subst tvar_fn in
+    let tvar_fn = closure tvar_fn tenv in
+    let tenv = remove tenv f in
+    let tenv = ext tenv f tvar_fn in
     let tenv, t2, subst', n = infer tenv e2 n in
     let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in
