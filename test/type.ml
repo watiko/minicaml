@@ -3,8 +3,33 @@ module Syntax = Minicaml.Syntax
 module Eval = Minicaml.Eval
 module Type = Minicaml.Type
 
+let unify_success t1 t2 =
+  try
+    let open Type in
+    let subst = unify [ t1, t2 ] in
+    let t1 = subst_ty subst t1 in
+    t1 = t2
+  with
+  | _ -> false
+;;
+
 let type_testable = Alcotest.testable Type.pprint_type ( = )
+let type_testable_uninfy = Alcotest.testable Type.pprint_type unify_success
 let parse = Eval.unsafeParse
+
+let infer_test ?(unify = false) ?(print_error = false) name exp tenv want =
+  let got =
+    try
+      let _, got = Type.infer tenv (parse exp) in
+      Some got
+    with
+    | e ->
+      if print_error then Fmt.pr "%s%a\n" (Printexc.to_string e) Fmt.flush ();
+      None
+  in
+  let testable' = if unify then type_testable_uninfy else type_testable in
+  Alcotest.(check (option testable')) name want got
+;;
 
 let test_var () =
   let open Type in
@@ -77,17 +102,7 @@ let test_if () =
     ; "if true then true else false", Some TBool
     ]
   in
-  List.iter
-    (fun (exp, t) ->
-      let got =
-        try
-          let _, got = infer (defaultenv ()) (parse exp) in
-          Some got
-        with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  List.iter (fun (exp, want) -> infer_test exp exp (defaultenv ()) want) table
 ;;
 
 let test_fun () =
@@ -112,17 +127,7 @@ let test_fun () =
     ; "(fun x -> x + 1)", Some (TArrow (TInt, TInt)), defaultenv ()
     ]
   in
-  List.iter
-    (fun (exp, t, tenv) ->
-      let got =
-        try
-          let _, got = infer tenv (parse exp) in
-          Some got
-        with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  List.iter (fun (exp, want, tenv) -> infer_test exp exp tenv want) table
 ;;
 
 let test_let () =
@@ -152,17 +157,7 @@ let test_let () =
       , ext (defaultenv ()) "bool" (ty_of_scheme @@ TVar "a") )
     ]
   in
-  List.iter
-    (fun (exp, t, tenv) ->
-      let got =
-        try
-          let _, got = infer tenv (parse exp) in
-          Some got
-        with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  List.iter (fun (exp, want, tenv) -> infer_test exp exp tenv want) table
 ;;
 
 let test_letrec () =
@@ -180,17 +175,7 @@ let test_letrec () =
       , Some TInt )
     ]
   in
-  List.iter
-    (fun (exp, t) ->
-      let got =
-        try
-          let _, got = infer (defaultenv ()) (parse exp) in
-          Some got
-        with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  List.iter (fun (exp, want) -> infer_test exp exp (defaultenv ()) want) table
 ;;
 
 let test_list () =
@@ -204,17 +189,7 @@ let test_list () =
     ; "[1; false; 1]", None
     ]
   in
-  List.iter
-    (fun (exp, t) ->
-      let got =
-        try
-          let _, got = infer (defaultenv ()) (parse exp) in
-          Some got
-        with
-        | _ -> None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  List.iter (fun (exp, want) -> infer_test exp exp (defaultenv ()) want) table
 ;;
 
 let test_match () =
@@ -231,22 +206,10 @@ let test_match () =
     ; "match [true; false] with | x :: [] -> x | x -> false", Some TBool
     ]
   in
-  List.iter
-    (fun (exp, t) ->
-      let tenv = defaultenv () in
-      let tenv = ext tenv "x'" (ty_of_scheme @@ TVar "a1") in
-      let tenv = ext tenv "y'" (ty_of_scheme @@ TVar "a2") in
-      let got =
-        try
-          let _, got = infer tenv (parse exp) in
-          Some got
-        with
-        | e ->
-          Fmt.pr "%s\n" (Printexc.to_string e);
-          None
-      in
-      Alcotest.(check (option type_testable)) exp t got)
-    table
+  let tenv = defaultenv () in
+  let tenv = ext tenv "x'" (ty_of_scheme @@ TVar "a1") in
+  let tenv = ext tenv "y'" (ty_of_scheme @@ TVar "a2") in
+  List.iter (fun (exp, want) -> infer_test ~print_error:true exp exp tenv want) table
 ;;
 
 let () =
