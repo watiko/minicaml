@@ -162,9 +162,13 @@ let test_let () =
 
 let test_letrec () =
   let open Type in
+  let etenv = defaultenv () in
+  let tenv = etenv in
+  let tenv = ext tenv "a" (ty_of_scheme @@ TVar "a") in
+  let tenv = ext tenv "b" (ty_of_scheme @@ TVar "b") in
   let table =
-    [ "let rec id x = x in id 1", Some TInt
-    ; "let rec fact n = if n = 0 then 1 else n * fact (n - 1) in fact 5", Some TInt
+    [ "let rec id x = x in id 1", Some TInt, etenv
+    ; "let rec fact n = if n = 0 then 1 else n * fact (n - 1) in fact 5", Some TInt, etenv
     ; ( {|
       let rec fact n = fun k ->
         if n = 0 then k 1
@@ -172,10 +176,15 @@ let test_letrec () =
              k (x * n))
       in fact 5 (fun x -> x)
       |}
-      , Some TInt )
+      , Some TInt
+      , etenv )
+    ; "let rec loop x = loop x in loop", Some (TArrow (TVar "a", TVar "b")), tenv
+    ; "let rec id x = x in id id", None, etenv (* todo: inspect *)
     ]
   in
-  List.iter (fun (exp, want) -> infer_test exp exp (defaultenv ()) want) table
+  List.iter
+    (fun (exp, want, tenv) -> infer_test ~unify:true ~print_error:true exp exp tenv want)
+    table
 ;;
 
 let test_list () =
