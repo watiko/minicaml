@@ -133,6 +133,21 @@ let test_let () =
   let tenv = etenv in
   let table =
     [ "let x = 1 in x", Some TInt, tenv
+    ; "let id = fun x -> x in id 1", Some TInt, tenv
+    ; "let id = fun x -> x + 1 in id", Some (TArrow (TInt, TInt)), tenv
+    ; ( {|let f = fun x ->
+            let g = fun y -> x + y in
+            g 100 in
+          f|}
+      , Some (TArrow (TInt, TInt))
+      , tenv )
+    ; ( {|let f =
+            let x = 100 in
+            let y = 200 in
+            x + y in
+          x|}
+      , None
+      , tenv )
     ; ( "let trueFn = fun x -> true in [trueFn 1; trueFn bool; trueFn ()]"
       , Some (TList TBool)
       , defaultenv () )
