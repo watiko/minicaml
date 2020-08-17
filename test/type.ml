@@ -180,22 +180,22 @@ let test_fun kind () =
       table)
 ;;
 
-let test_let kind () =
+let test_let () =
   let open Type in
   let etenv = defaultenv () in
   let tenv = etenv in
-  let table = [ "let x = 1 in x", Some TInt, tenv ] in
-  if kind = Check
-  then
-    List.iter
-      (fun (exp, t, tenv) ->
-        let got =
-          try Some (check (parse exp) tenv) with
-          | _ -> None
-        in
-        Alcotest.(check (option type_testable)) exp t got)
-      table
-  else
+  let table = [ "let x = 1 in x", Some TInt, tenv;
+                "let id = fun x -> x in id 1", Some TInt, tenv;
+                "let id = fun x -> x + 1 in id", Some (TArrow (TInt, TInt)), tenv;
+                "let f = fun x ->
+                   let g = fun y -> x + y in
+                   g 100 in f", Some (TArrow (TInt, TInt)), tenv;
+                "let f =
+                   let x = 100 in
+                   let y = 200 in
+                   x + y in
+                 x", None, tenv;
+              ] [@ocamlformat "disable"] in
     List.iter
       (fun (exp, t, tenv) ->
         let got =
@@ -304,7 +304,6 @@ let () =
         ; Alcotest.test_case "int_binop" `Quick @@ test_int_binop Check
         ; Alcotest.test_case "if" `Quick @@ test_if Check
         ; Alcotest.test_case "fun" `Quick @@ test_fun Check
-        ; Alcotest.test_case "let" `Quick @@ test_let Check
         ] )
     ; ( "infer"
       , [ Alcotest.test_case "var" `Quick @@ test_var Infer
@@ -312,7 +311,7 @@ let () =
         ; Alcotest.test_case "int_binop" `Quick @@ test_int_binop Infer
         ; Alcotest.test_case "if" `Quick @@ test_if Infer
         ; Alcotest.test_case "fun" `Quick @@ test_fun Infer
-        ; Alcotest.test_case "let" `Quick @@ test_let Infer
+        ; Alcotest.test_case "let" `Quick @@ test_let
         ; Alcotest.test_case "letrec" `Quick test_letrec
         ; Alcotest.test_case "list" `Quick test_list
         ; Alcotest.test_case "match" `Quick test_match
