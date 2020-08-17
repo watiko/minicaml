@@ -48,10 +48,18 @@ let pprint_schema ppf ts =
       t
 ;;
 
-let new_typevar n = TVar ("'a" ^ string_of_int n), n + 1
-
 type tyenv = (string * scheme) list
 type tysubst = (tyvar * ty) list
+
+type ctx =
+  { tenv : tyenv
+  ; n : int
+  }
+
+let new_typevar ctx =
+  let n = ctx.n in
+  { ctx with n = n + 1 }, TVar ("'a" ^ string_of_int n)
+;;
 
 let emptytenv () = []
 let lookup = Eval.lookup
@@ -210,17 +218,17 @@ let vars_of_subst (subst : tysubst) =
   list_uniq @@ List.flatten @@ List.map (fun (x, t) -> x :: freetyvar_ty t) subst
 ;;
 
-let subst_ts subst ts n =
+let subst_ts subst ts ctx =
   match ts with
   | TScheme (tvars, t) ->
     let collisionvars = list_inter tvars @@ vars_of_subst subst in
-    let subst', n =
+    let ctx, subst' =
       List.fold_left
-        (fun (subst', n) var ->
-          let newvar, n = new_typevar n in
+        (fun (ctx, subst') var ->
+          let ctx, newvar = new_typevar ctx in
           let subst' = (var, newvar) :: subst' in
-          subst', n)
-        ([], n)
+          ctx, subst')
+        (ctx, [])
         collisionvars
     in
     (* fresh *)
@@ -228,17 +236,17 @@ let subst_ts subst ts n =
     let t = subst_ty subst' t in
     let tvars = subst_tvars subst tvars in
     let t = subst_ty subst t in
-    TScheme (tvars, t), n
+    ctx, TScheme (tvars, t)
 ;;
 
-let subst_tyenv subst tenv n =
+let subst_tyenv subst ctx =
   List.fold_right
-    (fun (x, ts) (tenv, n) ->
-      let ts, n = subst_ts subst ts n in
-      let tenv = ext tenv x ts in
-      tenv, n)
-    tenv
-    (emptytenv (), n)
+    (fun (x, ts) ctx ->
+      let ctx, ts = subst_ts subst ts ctx in
+      let tenv = ext ctx.tenv x ts in
+      { ctx with tenv })
+    ctx.tenv
+    { ctx with tenv = defaultenv () }
 ;;
 
 let subst_eql subst eql =
@@ -290,20 +298,20 @@ let unify eql =
   | Ok subst -> subst
 ;;
 
-let instantiate ts n =
+let instantiate ts ctx =
   match ts with
   | TScheme (tvars, t) ->
-    let subst, n =
+    let ctx, subst =
       List.fold_left
-        (fun (subst, n) tvar ->
-          let newtvar, n = new_typevar n in
+        (fun (ctx, subst) tvar ->
+          let ctx, newtvar = new_typevar ctx in
           let subst = compose_subst subst [ tvar, newtvar ] in
-          subst, n)
-        ([], n)
+          ctx, subst)
+        (ctx, [])
         tvars
     in
     let t = subst_ty subst t in
-    t, n
+    ctx, t
 ;;
 
 let generalize t tenv =
@@ -320,149 +328,153 @@ let%test "generalize: complex" =
   generalize t tenv = TScheme ([ "b" ], t)
 ;;
 
-let rec infer tenv e n =
+let rec infer ctx e =
   match e with
   | Var x ->
-    (match lookup x tenv with
+    (match lookup x ctx.tenv with
     | Some ts ->
-      let t, n = instantiate ts n in
-      tenv, t, esubst, n
+      let ctx, t = instantiate ts ctx in
+      ctx, t, esubst
     | None -> failwith @@ "failed to lookup type of var " ^ x)
-  | Unit -> tenv, TUnit, esubst, n
-  | IntLit _ -> tenv, TInt, esubst, n
-  | BoolLit _ -> tenv, TBool, esubst, n
-  | StrLit _ -> tenv, TString, esubst, n
+  | Unit -> ctx, TUnit, esubst
+  | IntLit _ -> ctx, TInt, esubst
+  | BoolLit _ -> ctx, TBool, esubst
+  | StrLit _ -> ctx, TString, esubst
   | FailWith _ ->
-    let tvar, n = new_typevar n in
-    tenv, tvar, esubst, n
+    let ctx, tvar = new_typevar ctx in
+    ctx, tvar, esubst
   | Plus (e1, e2) | Minus (e1, e2) | Times (e1, e2) | Div (e1, e2) ->
-    binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TInt
+    binop_infer ctx e1 e2 (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TInt
   | Greater (e1, e2) | Less (e1, e2) ->
-    binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TBool
-  | Eq (e1, e2) -> binop_infer tenv e1 e2 n (fun (t1, t2) -> [ t1, t2 ]) TBool
+    binop_infer ctx e1 e2 (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TBool
+  | Eq (e1, e2) -> binop_infer ctx e1 e2 (fun (t1, t2) -> [ t1, t2 ]) TBool
   | If (c, et, ef) ->
-    let tenv, ct, subst, n = infer tenv c n in
+    let ctx, ct, subst = infer ctx c in
     let subst_c = unify [ ct, TBool ] in
     let subst = compose_subst subst subst_c in
-    let tenv, n = subst_tyenv subst tenv n in
-    let tenv, tt, subst_t, n = infer tenv et n in
+    let ctx = subst_tyenv subst ctx in
+    let ctx, tt, subst_t = infer ctx et in
     let subst = compose_subst subst subst_t in
-    let tenv, n = subst_tyenv subst tenv n in
-    let tenv, tf, subst_f, n = infer tenv ef n in
+    let ctx = subst_tyenv subst ctx in
+    let ctx, tf, subst_f = infer ctx ef in
     let subst = compose_subst subst subst_f in
     let tt = subst_ty subst tt in
     let tf = subst_ty subst tf in
     let subst_r = unify [ tt, tf ] in
     let subst = compose_subst subst subst_r in
     let tt = subst_ty subst tt in
-    tenv, tt, subst, n
+    ctx, tt, subst
   | Fun (x, e) ->
-    let tvar, n = new_typevar n in
-    let tenv = ext tenv x (ty_of_scheme tvar) in
-    let tenv, t, subst, n = infer tenv e n in
+    let ctx, tvar = new_typevar ctx in
+    let tenv = ext ctx.tenv x (ty_of_scheme tvar) in
+    let ctx, t, subst = infer { ctx with tenv } e in
     let tvar = subst_ty subst tvar in
-    let tenv = remove tenv x in
-    tenv, TArrow (tvar, t), subst, n
+    let tenv = remove ctx.tenv x in
+    { ctx with tenv }, TArrow (tvar, t), subst
   | App (e1, e2) ->
-    let tenv, t1, subst1, n = infer tenv e1 n in
-    let tenv, t2, subst2, n = infer tenv e2 n in
-    let tvar, n = new_typevar n in
+    let ctx, t1, subst1 = infer ctx e1 in
+    let ctx, t2, subst2 = infer ctx e2 in
+    let ctx, tvar = new_typevar ctx in
     let t1 = subst_ty subst2 t1 in
     let subst3 = unify [ t1, TArrow (t2, tvar) ] in
     let tvar = subst_ty subst3 tvar in
-    let tenv, n = subst_tyenv subst3 tenv n in
+    let ctx = subst_tyenv subst3 ctx in
     let subst4 = compose_subst subst1 subst2 in
     let subst4 = compose_subst subst3 subst4 in
-    tenv, tvar, subst4, n
+    ctx, tvar, subst4
   | Let (x, e1, e2) ->
-    let tenv, t1, subst1, n = infer tenv e1 n in
+    let ctx, t1, subst1 = infer ctx e1 in
+    let tenv = ctx.tenv in
     let t1 = generalize t1 tenv in
     let tenv = ext tenv x t1 in
-    let tenv, t2, subst2, n = infer tenv e2 n in
+    let ctx, t2, subst2 = infer { ctx with tenv } e2 in
     let subst = compose_subst subst1 subst2 in
     let t2 = subst_ty subst t2 in
+    let tenv = ctx.tenv in
     let tenv = remove tenv x in
-    tenv, t2, subst, n
+    { ctx with tenv }, t2, subst
   | LetRec (f, x, e1, e2) ->
-    let tvar_fn, n = new_typevar n in
-    let tvar_arg, n = new_typevar n in
+    let ctx, tvar_fn = new_typevar ctx in
+    let ctx, tvar_arg = new_typevar ctx in
+    let tenv = ctx.tenv in
     let tenv = ext tenv f (ty_of_scheme tvar_fn) in
     let tenv = ext tenv x (ty_of_scheme tvar_arg) in
-    let tenv, t1, subst, n = infer tenv e1 n in
+    let ctx, t1, subst = infer { ctx with tenv } e1 in
     (* todo: simplify subst *)
     let tvar_fn = subst_ty subst tvar_fn in
     let tvar_fn = subst_ty subst tvar_fn in
     let tvar_arg = subst_ty subst tvar_arg in
     let subst' = unify [ tvar_fn, TArrow (tvar_arg, t1) ] in
     let subst = compose_subst subst subst' in
-    let tenv, n = subst_tyenv subst tenv n in
+    let ctx = subst_tyenv subst ctx in
+    let tenv = ctx.tenv in
     let tvar_fn = subst_ty subst tvar_fn in
     let tvar_fn = generalize tvar_fn tenv in
     let tenv = remove tenv f in
     let tenv = ext tenv f tvar_fn in
     let tenv = remove tenv x in
-    let tenv, t2, subst', n = infer tenv e2 n in
+    let ctx, t2, subst' = infer { ctx with tenv } e2 in
     let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in
-    tenv, t2, subst, n
+    ctx, t2, subst
   | Match (e1, cases) ->
-    let loop (subst1, tenv, n, bt, t1) (p, b) =
+    let loop (subst1, ctx, bt, t1) (p, b) =
       let vars = freevar p in
-      let tenv, n =
+      let ctx =
         List.fold_left
-          (fun (tenv, n) var ->
-            let tvar, n = new_typevar n in
-            let tenv = ext tenv var (ty_of_scheme tvar) in
-            tenv, n)
-          (tenv, n)
+          (fun ctx var ->
+            let ctx, tvar = new_typevar ctx in
+            let tenv = ext ctx.tenv var (ty_of_scheme tvar) in
+            { ctx with tenv })
+          ctx
           vars
       in
-      let tenv, pt, subst', n = infer tenv p n in
+      let ctx, pt, subst' = infer ctx p in
       let subst = compose_subst subst1 subst' in
       let subst' = unify [ t1, pt ] in
       let subst = compose_subst subst subst' in
-      let tenv, n = subst_tyenv subst tenv n in
-      let tenv, bt', subst_b, n = infer tenv b n in
+      let ctx = subst_tyenv subst ctx in
+      let ctx, bt', subst_b = infer ctx b in
       let subst = compose_subst subst subst_b in
       let subst' = unify [ bt, bt' ] in
       let subst_b = compose_subst subst_b subst' in
       let subst = compose_subst subst subst' in
       let bt = subst_ty subst bt in
-      let tenv = List.fold_left (fun tenv var -> remove tenv var) tenv vars in
+      let tenv = List.fold_left (fun tenv var -> remove tenv var) ctx.tenv vars in
       let subst = compose_subst subst1 subst_b in
-      subst, tenv, n, bt, t1
+      subst, { ctx with tenv }, bt, t1
     in
-    let tenv, t1, subst1, n = infer tenv e1 n in
-    let bt, n = new_typevar n in
-    let subst, tenv, n, bt, _ = List.fold_left loop (subst1, tenv, n, bt, t1) cases in
-    let tenv, n = subst_tyenv subst tenv n in
-    tenv, bt, subst, n
+    let ctx, t1, subst1 = infer ctx e1 in
+    let ctx, bt = new_typevar ctx in
+    let subst, ctx, bt, _ = List.fold_left loop (subst1, ctx, bt, t1) cases in
+    let ctx = subst_tyenv subst ctx in
+    ctx, bt, subst
   | Empty ->
-    let tvar, n = new_typevar n in
-    tenv, TList tvar, esubst, n
+    let ctx, tvar = new_typevar ctx in
+    ctx, TList tvar, esubst
   | Cons (e1, e2) ->
-    let tenv, t1, subst1, n = infer tenv e1 n in
-    let tenv, t2, subst2, n = infer tenv e2 n in
+    let ctx, t1, subst1 = infer ctx e1 in
+    let ctx, t2, subst2 = infer ctx e2 in
     let t1 = subst_ty subst2 t1 in
     let subst = compose_subst subst1 subst2 in
     let subst' = unify [ t2, TList t1 ] in
     let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in
-    let tenv, n = subst_tyenv subst tenv n in
-    tenv, t2, subst, n
+    let ctx = subst_tyenv subst ctx in
+    ctx, t2, subst
 
-and binop_infer tenv e1 e2 n cmp retType =
-  let tenv, t1, subst1, n = infer tenv e1 n in
-  let tenv, t2, subst2, n = infer tenv e2 n in
+and binop_infer ctx e1 e2 cmp retType =
+  let ctx, t1, subst1 = infer ctx e1 in
+  let ctx, t2, subst2 = infer ctx e2 in
   let t1 = subst_ty subst2 t1 in
   let subst3 = unify (cmp (t1, t2)) in
-  let tenv, n = subst_tyenv subst3 tenv n in
+  let ctx = subst_tyenv subst3 ctx in
   let subst4 = compose_subst subst1 subst2 in
   let subst4 = compose_subst subst3 subst4 in
-  tenv, retType, subst4, n
+  ctx, retType, subst4
 ;;
 
 let infer tenv e =
-  let tenv, t, _, _ = infer tenv e 0 in
-  tenv, t
+  let ctx, t, _ = infer { tenv; n = 0 } e in
+  ctx.tenv, t
 ;;
