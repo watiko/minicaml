@@ -9,10 +9,10 @@ let parse = Eval.unsafeParse
 let test_var () =
   let open Type in
   let tenv = defaultenv () in
-  let tenv = ext tenv "x" (generalize TInt tenv) in
-  let tenv = ext tenv "y" (generalize TBool tenv) in
-  let tenv = ext tenv "z" (generalize TString tenv) in
-  let tenv = ext tenv "x" (generalize TUnit tenv) in
+  let tenv = ext tenv "x" (ty_of_scheme TInt) in
+  let tenv = ext tenv "y" (ty_of_scheme TBool) in
+  let tenv = ext tenv "z" (ty_of_scheme TString) in
+  let tenv = ext tenv "x" (ty_of_scheme TUnit) in
   let table =
     [ "x", TUnit, tenv
     ; "y", TBool, tenv
@@ -96,19 +96,19 @@ let test_fun () =
   let open Type in
   let etenv = defaultenv () in
   let tenv = etenv in
-  let tenv = ext tenv "print" @@ generalize (TArrow (TString, TUnit)) tenv in
+  let tenv = ext tenv "print" @@ ty_of_scheme (TArrow (TString, TUnit)) in
   let table =
     [ {|print "hello"|}, Some TUnit, tenv
     ; ( "fun x -> if true then x else 100"
       , Some (TArrow (TInt, TInt))
-      , ext etenv "x" (generalize TInt etenv) )
+      , ext etenv "x" (ty_of_scheme TInt) )
     ; ( "(fun x -> if true then x else 100) (if true then y else 200)"
       , Some TInt
-      , ext (ext etenv "x" (generalize TInt etenv)) "y" (generalize TInt etenv) )
+      , ext (ext etenv "x" (ty_of_scheme TInt)) "y" (ty_of_scheme TInt) )
     ; ( "fun f -> (fun x -> f (f (f x + 10)))"
       , Some (TArrow (TArrow (TInt, TInt), TArrow (TInt, TInt)))
-      , let tenv = ext etenv "f" @@ generalize (TArrow (TInt, TInt)) etenv in
-        let tenv = ext tenv "x" @@ generalize TInt tenv in
+      , let tenv = ext etenv "f" @@ ty_of_scheme (TArrow (TInt, TInt)) in
+        let tenv = ext tenv "x" @@ ty_of_scheme TInt in
         tenv )
     ; "(fun x -> x) true", Some TBool, defaultenv ()
     ; "(fun x -> x + 1)", Some (TArrow (TInt, TInt)), defaultenv ()
@@ -131,15 +131,12 @@ let test_let () =
   let open Type in
   let etenv = defaultenv () in
   let tenv = etenv in
-  let table = [ "let x = 1 in x", Some TInt, tenv ] in
   let table =
-    List.concat
-      [ table
-      ; [ ( "let trueFn = fun x -> true in [trueFn 1; trueFn bool; trueFn ()]"
-          , Some (TList TBool)
-          , defaultenv () )
-        ]
-      ]
+    [ "let x = 1 in x", Some TInt, tenv
+    ; ( "let trueFn = fun x -> true in [trueFn 1; trueFn bool; trueFn ()]"
+      , Some (TList TBool)
+      , defaultenv () )
+    ]
   in
   List.iter
     (fun (exp, t, tenv) ->
