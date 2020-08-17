@@ -75,16 +75,22 @@ let%test "remove" =
   remove tenv "x" = tenv'
 ;;
 
-let defaultenv = emptytenv
+let defaultenv () =
+  let ta = TVar "'a" in
+  let lista = TList ta in
+  let tenv = emptytenv () in
+  let tenv = ext tenv "failwith" (TScheme ([ "'a" ], TArrow (TString, ta))) in
+  let tenv = ext tenv "List.hd" (TScheme ([ "'a" ], TArrow (lista, ta))) in
+  let tenv = ext tenv "List.tl" (TScheme ([ "'a" ], TArrow (lista, lista))) in
+  tenv
+;;
+
 let esubst : tysubst = []
 
 let freevar e =
   let rec freevar e k =
     match e with
-    | Var x ->
-      (match x with
-      | "_" -> k []
-      | x -> k [ x ])
+    | Var x -> k [ x ]
     | Cons (hd, tl) ->
       freevar hd (fun vars1 ->
           freevar tl (fun vars2 -> k @@ List.concat [ vars1; vars2 ]))
@@ -321,10 +327,7 @@ let rec infer tenv e n =
     | Some ts ->
       let t, n = instantiate ts n in
       tenv, t, esubst, n
-    | None ->
-      let tvar, n = new_typevar n in
-      let tenv = ext tenv x (ty_of_scheme tvar) in
-      tenv, tvar, esubst, n)
+    | None -> failwith @@ "failed to lookup type of var " ^ x)
   | Unit -> tenv, TUnit, esubst, n
   | IntLit _ -> tenv, TInt, esubst, n
   | BoolLit _ -> tenv, TBool, esubst, n
@@ -378,6 +381,7 @@ let rec infer tenv e n =
     let tenv, t2, subst2, n = infer tenv e2 n in
     let subst = compose_subst subst1 subst2 in
     let t2 = subst_ty subst t2 in
+    let tenv = remove tenv x in
     tenv, t2, subst, n
   | LetRec (f, x, e1, e2) ->
     let tvar_fn, n = new_typevar n in
@@ -396,6 +400,7 @@ let rec infer tenv e n =
     let tvar_fn = generalize tvar_fn tenv in
     let tenv = remove tenv f in
     let tenv = ext tenv f tvar_fn in
+    let tenv = remove tenv x in
     let tenv, t2, subst', n = infer tenv e2 n in
     let subst = compose_subst subst subst' in
     let t2 = subst_ty subst t2 in

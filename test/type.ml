@@ -52,7 +52,6 @@ let test_int_binop () =
     ; "1 > 20", TBool
     ; "1 < 20", TBool
     ; "1 = 1", TBool
-    ; "x = y + 1", TBool
     ]
   in
   List.iter
@@ -76,7 +75,6 @@ let test_if () =
     ; "if true then () else ()", Some TUnit
     ; "if true then \"\" else \"\"", Some TString
     ; "if true then true else false", Some TBool
-    ; "if true then x else 100", Some TInt
     ]
   in
   List.iter
@@ -148,9 +146,10 @@ let test_let () =
           x|}
       , None
       , tenv )
+    ; "let rec f x = x + 1 in x", None, tenv
     ; ( "let trueFn = fun x -> true in [trueFn 1; trueFn bool; trueFn ()]"
       , Some (TList TBool)
-      , defaultenv () )
+      , ext (defaultenv ()) "bool" (ty_of_scheme @@ TVar "a") )
     ]
   in
   List.iter
@@ -201,7 +200,6 @@ let test_list () =
     ; "[false]", Some (TList TBool)
     ; "[1; 2; 3; 4; 5]", Some (TList TInt)
     ; "let x = 1 in [x]", Some (TList TInt)
-    ; "[1; x]", Some (TList TInt)
     ; "[1; false]", None
     ; "[1; false; 1]", None
     ]
@@ -213,10 +211,7 @@ let test_list () =
           let _, got = infer (defaultenv ()) (parse exp) in
           Some got
         with
-        (* | _ -> None *)
-        | e ->
-          print_string (Printexc.to_string e);
-          None
+        | _ -> None
       in
       Alcotest.(check (option type_testable)) exp t got)
     table
@@ -227,8 +222,8 @@ let test_match () =
   let table =
     [ "match true with x -> x", Some TBool
     ; "match true with | 1 -> 1 | 2 -> 2", None
-    ; "match x with | 1 -> 1 | 2 -> 2", Some TInt
-    ; "match x with | 1 -> 1 | _ -> y", Some TInt
+    ; "match x' with | 1 -> 1 | 2 -> 2", Some TInt
+    ; "match x' with | 1 -> 1 | _ -> y'", Some TInt
     ; "match [] with | [] -> 1 | h :: tl -> h", Some TInt
     ; "match [1; 2; 3] with | [] -> failwith \"fail\" | h :: _ -> h", Some TInt
     ; "fun x -> match 1 with x -> x", Some (TArrow (TVar "'a0", TInt))
@@ -238,14 +233,16 @@ let test_match () =
   in
   List.iter
     (fun (exp, t) ->
+      let tenv = defaultenv () in
+      let tenv = ext tenv "x'" (ty_of_scheme @@ TVar "a1") in
+      let tenv = ext tenv "y'" (ty_of_scheme @@ TVar "a2") in
       let got =
         try
-          let _, got = infer (defaultenv ()) (parse exp) in
+          let _, got = infer tenv (parse exp) in
           Some got
         with
-        (* | _ -> None *)
         | e ->
-          print_string (Printexc.to_string e);
+          Fmt.pr "%s\n" (Printexc.to_string e);
           None
       in
       Alcotest.(check (option type_testable)) exp t got)
