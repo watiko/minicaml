@@ -102,7 +102,7 @@ let rec pprint_value ppf = function
   | UnitVal -> Fmt.pf ppf "UnitVal"
   | IntVal n -> Fmt.pf ppf "IntVal %d" n
   | BoolVal b -> Fmt.pf ppf "BoolVal %b" b
-  | StrVal s -> Fmt.pf ppf "BoolVal %s" s
+  | StrVal s -> Fmt.pf ppf "StrVal %s" s
   | ListVal l -> Fmt.pf ppf "@[<v 2>ListVal@ %a@]" (Fmt.list pprint_value) l
   | FunVal (n, e, env) ->
     Fmt.pf ppf "@[<v 2>FunVal@ %s@ %a@ %a@]" n pprint_exp e pprint_env env
@@ -118,7 +118,7 @@ let pprint_value_simplified ppf = function
   | UnitVal -> Fmt.pf ppf "UnitVal"
   | IntVal n -> Fmt.pf ppf "IntVal %d" n
   | BoolVal b -> Fmt.pf ppf "BoolVal %b" b
-  | StrVal s -> Fmt.pf ppf "BoolVal %s" s
+  | StrVal s -> Fmt.pf ppf "StrVal %s" s
   | ListVal l -> Fmt.pf ppf "@[<v 2>ListVal@ %a@]" (Fmt.list pprint_value) l
   | FunVal (n, e, _) -> Fmt.pf ppf "@[<v 2>FunVal@ %s@ %a@]" n pprint_exp e
   | RecFunVal (n, x, e, _) -> Fmt.pf ppf "@[<v 2>RetFunVal@ %s@ %s@ %a@]" n x pprint_exp e
