@@ -21,6 +21,13 @@ $ dune build
 $ dune runtest
 ```
 
+### try REPL
+
+```bash
+$ dune exec minicaml
+$ rlwrap dune exec minicaml
+```
+
 ### format
 
 ```bash

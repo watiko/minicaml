@@ -113,3 +113,13 @@ and pprint_env ppf env =
   let pp_list = Fmt.(list (pair string pprint_value)) in
   Fmt.pf ppf "@[<v 2>env@ %a@]" pp_list env
 ;;
+
+let pprint_value_simplified ppf = function
+  | UnitVal -> Fmt.pf ppf "UnitVal"
+  | IntVal n -> Fmt.pf ppf "IntVal %d" n
+  | BoolVal b -> Fmt.pf ppf "BoolVal %b" b
+  | StrVal s -> Fmt.pf ppf "BoolVal %s" s
+  | ListVal l -> Fmt.pf ppf "@[<v 2>ListVal@ %a@]" (Fmt.list pprint_value) l
+  | FunVal (n, e, _) -> Fmt.pf ppf "@[<v 2>FunVal@ %s@ %a@]" n pprint_exp e
+  | RecFunVal (n, x, e, _) -> Fmt.pf ppf "@[<v 2>RetFunVal@ %s@ %s@ %a@]" n x pprint_exp e
+;;
