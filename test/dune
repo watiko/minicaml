@@ -1,5 +1,3 @@
 (tests
  (names parser eval type)
- (libraries minicaml alcotest)
- (preprocess
-  (pps ppx_inline_test)))
+ (libraries minicaml alcotest))

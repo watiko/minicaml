@@ -3,21 +3,29 @@ module Syntax = Minicaml.Syntax
 module Eval = Minicaml.Eval
 module Type = Minicaml.Type
 
-let unify_success t1 t2 =
-  try
-    let open Type in
-    let subst = unify [ t1, t2 ] in
-    let t1 = subst_ty subst t1 in
-    t1 = t2
-  with
-  | _ -> false
+let normalize_ty t =
+  let open Type in
+  let new_tyvar n =
+    let _, tv = Tyvar.from_age n in
+    TVar tv
+  in
+  let tvars = List.sort_uniq Tyvar.compare @@ freetyvar_ty t in
+  let new_tvars = List.init (List.length tvars) new_tyvar in
+  let subst = List.map2 (fun tvar new_tvar -> tvar, new_tvar) tvars new_tvars in
+  subst_ty subst t
+;;
+
+let normalize_eq t1 t2 =
+  let t1 = normalize_ty t1 in
+  let t2 = normalize_ty t2 in
+  t1 = t2
 ;;
 
 let type_testable = Alcotest.testable Type.pprint_type ( = )
-let type_testable_uninfy = Alcotest.testable Type.pprint_type unify_success
+let type_testable_normalize = Alcotest.testable Type.pprint_type normalize_eq
 let parse = Eval.unsafeParse
 
-let infer_test ?(unify = false) ?(print_error = false) name exp tenv want =
+let infer_test ?(normalize = false) ?(print_error = false) name exp tenv want =
   let got =
     try
       let _, got = Type.infer tenv (parse exp) in
@@ -27,7 +35,7 @@ let infer_test ?(unify = false) ?(print_error = false) name exp tenv want =
       if print_error then Fmt.pr "%s%a\n" (Printexc.to_string e) Fmt.flush ();
       None
   in
-  let testable' = if unify then type_testable_uninfy else type_testable in
+  let testable' = if normalize then type_testable_normalize else type_testable in
   Alcotest.(check (option testable')) name want got
 ;;
 
@@ -154,7 +162,7 @@ let test_let () =
     ; "let rec f x = x + 1 in x", None, tenv
     ; ( "let trueFn = fun x -> true in [trueFn 1; trueFn bool; trueFn ()]"
       , Some (TList TBool)
-      , ext (defaultenv ()) "bool" (ty_of_scheme @@ TVar "a") )
+      , ext (defaultenv ()) "bool" (ty_of_scheme @@ TVar ("a", -10)) )
     ]
   in
   List.iter (fun (exp, want, tenv) -> infer_test exp exp tenv want) table
@@ -163,9 +171,12 @@ let test_let () =
 let test_letrec () =
   let open Type in
   let etenv = defaultenv () in
+  let n = -10 in
+  let n, ta = Tyvar.from_age n in
+  let _, tb = Tyvar.from_age n in
   let tenv = etenv in
-  let tenv = ext tenv "a" (ty_of_scheme @@ TVar "a") in
-  let tenv = ext tenv "b" (ty_of_scheme @@ TVar "b") in
+  let tenv = ext tenv "a" (ty_of_scheme @@ TVar ta) in
+  let tenv = ext tenv "b" (ty_of_scheme @@ TVar tb) in
   let table =
     [ "let rec id x = x in id 1", Some TInt, etenv
     ; "let rec fact n = if n = 0 then 1 else n * fact (n - 1) in fact 5", Some TInt, etenv
@@ -178,19 +189,21 @@ let test_letrec () =
       |}
       , Some TInt
       , etenv )
-    ; "let rec loop x = loop x in loop", Some (TArrow (TVar "a", TVar "b")), tenv
-    ; "let rec id x = x in id id", None, etenv (* todo: inspect *)
+    ; "let rec loop x = loop x in loop", Some (TArrow (TVar ta, TVar tb)), tenv
+    ; "let rec id x = x in id id", Some (TArrow (TVar ta, TVar ta)), etenv
     ]
   in
   List.iter
-    (fun (exp, want, tenv) -> infer_test ~unify:true ~print_error:true exp exp tenv want)
+    (fun (exp, want, tenv) ->
+      infer_test ~normalize:true ~print_error:true exp exp tenv want)
     table
 ;;
 
 let test_list () =
   let open Type in
+  let _, ta = Tyvar.from_age 0 in
   let table =
-    [ "[]", Some (TList (TVar "'a0"))
+    [ "[]", Some (TList (TVar ta))
     ; "[false]", Some (TList TBool)
     ; "[1; 2; 3; 4; 5]", Some (TList TInt)
     ; "let x = 1 in [x]", Some (TList TInt)
@@ -203,6 +216,9 @@ let test_list () =
 
 let test_match () =
   let open Type in
+  let _, ta = Tyvar.from_age 0 in
+  let _, tx = Tyvar.from_age 1 in
+  let _, ty = Tyvar.from_age 2 in
   let table =
     [ "match true with x -> x", Some TBool
     ; "match true with | 1 -> 1 | 2 -> 2", None
@@ -210,14 +226,14 @@ let test_match () =
     ; "match x' with | 1 -> 1 | _ -> y'", Some TInt
     ; "match [] with | [] -> 1 | h :: tl -> h", Some TInt
     ; "match [1; 2; 3] with | [] -> failwith \"fail\" | h :: _ -> h", Some TInt
-    ; "fun x -> match 1 with x -> x", Some (TArrow (TVar "'a0", TInt))
+    ; "fun x -> match 1 with x -> x", Some (TArrow (TVar ta, TInt))
     ; "fun x -> match 1 with | x -> x | _ -> x + 10", Some (TArrow (TInt, TInt))
     ; "match [true; false] with | x :: [] -> x | x -> false", Some TBool
     ]
   in
   let tenv = defaultenv () in
-  let tenv = ext tenv "x'" (ty_of_scheme @@ TVar "a1") in
-  let tenv = ext tenv "y'" (ty_of_scheme @@ TVar "a2") in
+  let tenv = ext tenv "x'" (ty_of_scheme @@ TVar tx) in
+  let tenv = ext tenv "y'" (ty_of_scheme @@ TVar ty) in
   List.iter (fun (exp, want) -> infer_test ~print_error:true exp exp tenv want) table
 ;;
 
