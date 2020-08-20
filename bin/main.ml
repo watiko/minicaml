@@ -38,13 +38,40 @@ let run s =
   pure (v, t)
 ;;
 
+let eat_script () =
+  let buffer = ref "" in
+  let next = ref true in
+  let terminate = Str.regexp_string ";;" in
+  let () =
+    while !next do
+      let line = input_line stdin in
+      let pos =
+        try
+          let pos = Str.search_forward terminate line 0 in
+          Some pos
+        with
+        | Not_found -> None
+      in
+      let content =
+        match pos with
+        | None -> line
+        | Some pos -> String.sub line 0 pos
+      in
+      let () = buffer := !buffer ^ "\n" ^ content in
+      let () = if Option.is_some pos then next := false else () in
+      ()
+    done
+  in
+  !buffer
+;;
+
 let () =
   let () = Fmt.pr "starting REPL...\n" in
   try
     while true do
       let () = Fmt.pr "> %a" Fmt.flush () in
-      let line = input_line stdin in
-      match run line with
+      let buffer = eat_script () in
+      match run buffer with
       | Error message -> Fmt.epr "error: %s\n%a" message Fmt.flush ()
       | Ok (v, t) ->
         Fmt.pr "type:  %a\n%a" Type.pprint_type t Fmt.flush ();
