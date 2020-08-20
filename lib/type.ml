@@ -77,6 +77,11 @@ let emptytenv () = []
 let lookup = Eval.lookup
 let ext = Eval.ext
 
+let lookup_by_age tvar subst =
+  let age = Tyvar.age tvar in
+  List.find_map (fun (tvar, ty) -> if age = Tyvar.age tvar then Some ty else None) subst
+;;
+
 let remove tenv x =
   let rec remove tenv x k =
     match tenv with
@@ -195,7 +200,7 @@ let rec subst_ty subst t =
   | TUnit -> TUnit
   | TArrow (from_t, to_t) -> TArrow (subst_ty subst from_t, subst_ty subst to_t)
   | TVar x ->
-    (match lookup x subst with
+    (match lookup_by_age x subst with
     | None -> TVar x
     | Some t -> t)
   | TList t -> TList (subst_ty subst t)
@@ -280,7 +285,7 @@ let compose_subst subst2 subst1 =
   let subst1' = List.map (fun (tx, t) -> tx, subst_ty subst2 t) subst1 in
   List.fold_left
     (fun subst (x, t) ->
-      match lookup x subst1 with
+      match lookup_by_age x subst1 with
       | Some _ -> subst
       | None -> (x, t) :: subst)
     subst1'
