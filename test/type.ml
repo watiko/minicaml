@@ -3,21 +3,29 @@ module Syntax = Minicaml.Syntax
 module Eval = Minicaml.Eval
 module Type = Minicaml.Type
 
-let unify_success t1 t2 =
-  try
-    let open Type in
-    let subst = unify [ t1, t2 ] in
-    let t1 = subst_ty subst t1 in
-    t1 = t2
-  with
-  | _ -> false
+let normalize_ty t =
+  let open Type in
+  let new_tyvar n =
+    let _, tv = Tyvar.from_age n in
+    TVar tv
+  in
+  let tvars = List.sort_uniq Tyvar.compare @@ freetyvar_ty t in
+  let new_tvars = List.init (List.length tvars) new_tyvar in
+  let subst = List.map2 (fun tvar new_tvar -> tvar, new_tvar) tvars new_tvars in
+  subst_ty subst t
+;;
+
+let normalize_eq t1 t2 =
+  let t1 = normalize_ty t1 in
+  let t2 = normalize_ty t2 in
+  t1 = t2
 ;;
 
 let type_testable = Alcotest.testable Type.pprint_type ( = )
-let type_testable_uninfy = Alcotest.testable Type.pprint_type unify_success
+let type_testable_normalize = Alcotest.testable Type.pprint_type normalize_eq
 let parse = Eval.unsafeParse
 
-let infer_test ?(unify = false) ?(print_error = false) name exp tenv want =
+let infer_test ?(normalize = false) ?(print_error = false) name exp tenv want =
   let got =
     try
       let _, got = Type.infer tenv (parse exp) in
@@ -27,7 +35,7 @@ let infer_test ?(unify = false) ?(print_error = false) name exp tenv want =
       if print_error then Fmt.pr "%s%a\n" (Printexc.to_string e) Fmt.flush ();
       None
   in
-  let testable' = if unify then type_testable_uninfy else type_testable in
+  let testable' = if normalize then type_testable_normalize else type_testable in
   Alcotest.(check (option testable')) name want got
 ;;
 
@@ -163,8 +171,9 @@ let test_let () =
 let test_letrec () =
   let open Type in
   let etenv = defaultenv () in
-  let _, ta = Tyvar.from_age (-10) in
-  let _, tb = Tyvar.from_age (-11) in
+  let n = -10 in
+  let n, ta = Tyvar.from_age n in
+  let _, tb = Tyvar.from_age n in
   let tenv = etenv in
   let tenv = ext tenv "a" (ty_of_scheme @@ TVar ta) in
   let tenv = ext tenv "b" (ty_of_scheme @@ TVar tb) in
@@ -181,11 +190,12 @@ let test_letrec () =
       , Some TInt
       , etenv )
     ; "let rec loop x = loop x in loop", Some (TArrow (TVar ta, TVar tb)), tenv
-    ; "let rec id x = x in id id", Some (TArrow (TVar ta, TVar tb)), etenv
+    ; "let rec id x = x in id id", Some (TArrow (TVar ta, TVar ta)), etenv
     ]
   in
   List.iter
-    (fun (exp, want, tenv) -> infer_test ~unify:true ~print_error:true exp exp tenv want)
+    (fun (exp, want, tenv) ->
+      infer_test ~normalize:true ~print_error:true exp exp tenv want)
     table
 ;;
 
