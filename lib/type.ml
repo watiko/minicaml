@@ -1,6 +1,17 @@
 open Syntax
 
-type tyvar = string
+module Tyvar = struct
+  type t = string * int
+
+  let name (n, _) = n
+  let age (_, a) = a
+  let compare t1 t2 = compare (age t1) (age t2)
+  let from_age n = n + 1, ("'a" ^ string_of_int n, n)
+end
+
+module TyvarSet = Set.Make (Tyvar)
+
+type tyvar = Tyvar.t
 
 type ty =
   | TInt
@@ -13,6 +24,7 @@ type ty =
 
 type scheme = TScheme of tyvar list * ty
 
+let pprint_tyvar ppf t = Fmt.pf ppf "%s" (Tyvar.name t)
 let ty_of_scheme t = TScheme ([], t)
 
 let type_name = function
@@ -31,7 +43,7 @@ let rec pprint_type ppf t =
   | TInt | TBool | TString | TUnit -> Fmt.pf ppf "%s" tname
   | TArrow (t1, t2) ->
     Fmt.pf ppf "@[<v 2>%s@ %a->@ %a@]" tname pprint_type t1 pprint_type t2
-  | TVar x -> Fmt.pf ppf "@[<v 2>%s(%s)@]" tname x
+  | TVar x -> Fmt.pf ppf "@[<v 2>%s(%s)@]" tname (Tyvar.name x)
   | TList t -> Fmt.pf ppf "@[<v 2>%s@ %a@]" tname pprint_type t
 ;;
 
@@ -42,7 +54,7 @@ let pprint_schema ppf ts =
     Fmt.pf
       ppf
       "@[<v 2>forall %a.@ %a@]"
-      (Fmt.list ~sep:Fmt.comma Fmt.string)
+      (Fmt.list ~sep:Fmt.comma pprint_tyvar)
       tyvars
       pprint_type
       t
@@ -57,8 +69,8 @@ type ctx =
   }
 
 let new_typevar ctx =
-  let n = ctx.n in
-  { ctx with n = n + 1 }, TVar ("'a" ^ string_of_int n)
+  let n, tvar = Tyvar.from_age ctx.n in
+  { ctx with n = n + 1 }, TVar tvar
 ;;
 
 let emptytenv () = []
@@ -84,12 +96,15 @@ let%test "remove" =
 ;;
 
 let defaultenv () =
-  let ta = TVar "'a" in
-  let lista = TList ta in
+  let _, ta = Tyvar.from_age (-1) in
+  let _, tb = Tyvar.from_age (-2) in
+  let _, tc = Tyvar.from_age (-3) in
   let tenv = emptytenv () in
-  let tenv = ext tenv "failwith" (TScheme ([ "'a" ], TArrow (TString, ta))) in
-  let tenv = ext tenv "List.hd" (TScheme ([ "'a" ], TArrow (lista, ta))) in
-  let tenv = ext tenv "List.tl" (TScheme ([ "'a" ], TArrow (lista, lista))) in
+  let tenv = ext tenv "failwith" (TScheme ([ ta ], TArrow (TString, TVar ta))) in
+  let tenv = ext tenv "List.hd" (TScheme ([ tb ], TArrow (TList (TVar tb), TVar tb))) in
+  let tenv =
+    ext tenv "List.tl" (TScheme ([ tc ], TArrow (TList (TVar tc), TList (TVar tc))))
+  in
   tenv
 ;;
 
@@ -111,7 +126,7 @@ let%test "freevar" = freevar (Var "x") = [ "x" ]
 let%test "freevar2" = freevar (Cons (Var "x", Cons (Var "y", Empty))) = [ "x"; "y" ]
 
 let list_diff l1 l2 =
-  let module SS = Set.Make (String) in
+  let module SS = TyvarSet in
   let s1 = SS.of_list l1 in
   let s2 = SS.of_list l2 in
   let ret = SS.diff s1 s2 in
@@ -119,7 +134,7 @@ let list_diff l1 l2 =
 ;;
 
 let list_inter l1 l2 =
-  let module SS = Set.Make (String) in
+  let module SS = TyvarSet in
   let s1 = SS.of_list l1 in
   let s2 = SS.of_list l2 in
   let ret = SS.inter s1 s2 in
@@ -127,7 +142,7 @@ let list_inter l1 l2 =
 ;;
 
 let list_uniq l =
-  let module SS = Set.Make (String) in
+  let module SS = TyvarSet in
   let s = SS.of_list l in
   SS.elements s
 ;;
@@ -187,16 +202,19 @@ let rec subst_ty subst t =
 ;;
 
 let%test "subst_ty: simple" =
+  let _, tx = Tyvar.from_age 0 in
   let subst = emptytenv () in
-  let subst = ext subst "x" TInt in
-  subst_ty subst (TVar "x") = TInt
+  let subst = ext subst tx TInt in
+  subst_ty subst (TVar tx) = TInt
 ;;
 
 let%test "subst_ty: complex" =
+  let _, tx = Tyvar.from_age 0 in
+  let _, ty = Tyvar.from_age 1 in
   let subst = emptytenv () in
-  let subst = ext subst "x" TInt in
-  let subst = ext subst "y" TBool in
-  subst_ty subst (TArrow (TVar "x", TVar "y")) = TArrow (TInt, TBool)
+  let subst = ext subst tx TInt in
+  let subst = ext subst ty TBool in
+  subst_ty subst (TArrow (TVar tx, TVar ty)) = TArrow (TInt, TBool)
 ;;
 
 let subst_tvars (subst : tysubst) tvars =
@@ -212,7 +230,12 @@ let subst_tvars (subst : tysubst) tvars =
     tvars
 ;;
 
-let%test "subst_tyvars" = subst_tvars [ "x", TVar "1" ] [ "x"; "y" ] = [ "1"; "y" ]
+let%test "subst_tyvars" =
+  let _, tx = Tyvar.from_age 0 in
+  let _, ty = Tyvar.from_age 1 in
+  let _, tz = Tyvar.from_age 2 in
+  subst_tvars [ tx, TVar tz ] [ tx; ty ] = [ tz; ty ]
+;;
 
 let vars_of_subst (subst : tysubst) =
   list_uniq @@ List.flatten @@ List.map (fun (x, t) -> x :: freetyvar_ty t) subst
@@ -322,10 +345,12 @@ let generalize t tenv =
 let%test "generalize: simple" = generalize TInt (emptytenv ()) = TScheme ([], TInt)
 
 let%test "generalize: complex" =
+  let ta = "a", 0 in
+  let tb = "b", 1 in
   let tenv = emptytenv () in
-  let tenv = ext tenv "xxxxx" (TScheme ([], TVar "a")) in
-  let t = TArrow (TVar "a", TVar "b") in
-  generalize t tenv = TScheme ([ "b" ], t)
+  let tenv = ext tenv "xxxxx" (TScheme ([], TVar ta)) in
+  let t = TArrow (TVar ta, TVar tb) in
+  generalize t tenv = TScheme ([ tb ], t)
 ;;
 
 let rec infer ctx e =
