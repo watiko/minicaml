@@ -1,6 +1,6 @@
 (executable
  (public_name minicaml)
  (name main)
- (libraries minicaml)
+ (libraries minicaml str)
  (preprocess
   (pps ppx_inline_test)))
