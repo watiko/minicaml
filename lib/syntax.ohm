@@ -49,6 +49,7 @@ MiniCaml {
     | var
     | int
     | bool
+    | string
     | Unit
     | EmptyList
     | List

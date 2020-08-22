@@ -47,7 +47,7 @@ let rec pprint_type ppf t =
   | TList t -> Fmt.pf ppf "@[<v 2>%s@ %a@]" tname pprint_type t
 ;;
 
-let pprint_schema ppf ts =
+let pprint_scheme ppf ts =
   match ts with
   | TScheme ([], t) -> pprint_type ppf t
   | TScheme (tyvars, t) ->
@@ -319,11 +319,42 @@ let unify eql =
   and sub x t eql subst =
     if occurs (TVar x) t
     then Error (Fmt.strf "type %s contains a reference to itself" (type_name t))
-    else solve (subst_eql [ x, t ] eql) (compose_subst [ x, t ] subst)
+    else (
+      match solve (subst_eql [ x, t ] eql) [] with
+      | Ok subst' ->
+        let subst = compose_subst subst subst' in
+        let subst = compose_subst subst [ x, t ] in
+        Ok subst
+      | _ as e -> e)
   in
   match solve eql [] with
   | Error message -> failwith @@ "unify failed: " ^ message
   | Ok subst -> subst
+;;
+
+let%test "unify_1" =
+  let n = 0 in
+  let n, t0 = Tyvar.from_age n in
+  let n, t1 = Tyvar.from_age n in
+  let _, t2 = Tyvar.from_age n in
+  let subst = unify [ TVar t0, TVar t1; TVar t0, TVar t2 ] in
+  [ t1, TVar t2; t0, TVar t2 ] = subst
+;;
+
+let%test "unify_2" =
+  let n = 0 in
+  let n, t0 = Tyvar.from_age n in
+  let n, t1 = Tyvar.from_age n in
+  let _, t2 = Tyvar.from_age n in
+  let subst = unify [ TVar t0, TVar t1; TVar t1, TVar t2 ] in
+  [ t1, TVar t2; t0, TVar t2 ] = subst
+;;
+
+let compose_subst_with_infer subst1 subst2 =
+  let subst = compose_subst subst1 subst2 in
+  let eql = List.map (fun (tv, t) -> TVar tv, t) subst in
+  let subst = unify eql in
+  subst
 ;;
 
 let instantiate ts ctx =
@@ -359,6 +390,7 @@ let%test "generalize: complex" =
 ;;
 
 let rec infer ctx e =
+  let compose_subst = compose_subst_with_infer in
   match e with
   | Var x ->
     (match lookup x ctx.tenv with
@@ -430,8 +462,6 @@ let rec infer ctx e =
     let tenv = ext tenv f (ty_of_scheme tvar_fn) in
     let tenv = ext tenv x (ty_of_scheme tvar_arg) in
     let ctx, t1, subst = infer { ctx with tenv } e1 in
-    (* todo: simplify subst *)
-    let tvar_fn = subst_ty subst tvar_fn in
     let tvar_fn = subst_ty subst tvar_fn in
     let tvar_arg = subst_ty subst tvar_arg in
     let subst' = unify [ tvar_fn, TArrow (tvar_arg, t1) ] in
