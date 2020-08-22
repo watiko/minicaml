@@ -47,7 +47,7 @@ let rec pprint_type ppf t =
   | TList t -> Fmt.pf ppf "@[<v 2>%s@ %a@]" tname pprint_type t
 ;;
 
-let pprint_schema ppf ts =
+let pprint_scheme ppf ts =
   match ts with
   | TScheme ([], t) -> pprint_type ppf t
   | TScheme (tyvars, t) ->
