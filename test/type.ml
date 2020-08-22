@@ -152,6 +152,12 @@ let test_let () =
           f|}
       , Some (TArrow (TInt, TInt))
       , tenv )
+    ; ( {|let hd = fun l -> match l with
+            | [] -> failwith "hd"
+            | h :: _ -> h
+          in hd [1]|}
+      , Some TInt
+      , tenv )
     ; ( {|let f =
             let x = 100 in
             let y = 200 in

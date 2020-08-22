@@ -389,8 +389,9 @@ let%test "generalize: complex" =
   generalize t tenv = TScheme ([ tb ], t)
 ;;
 
+let compose_subst = compose_subst_with_infer
+
 let rec infer ctx e =
-  let compose_subst = compose_subst_with_infer in
   match e with
   | Var x ->
     (match lookup x ctx.tenv with
@@ -478,7 +479,7 @@ let rec infer ctx e =
     let t2 = subst_ty subst t2 in
     ctx, t2, subst
   | Match (e1, cases) ->
-    let loop (subst1, ctx, bt, t1) (p, b) =
+    let loop (subst, ctx, bt, t1) (p, b) =
       let vars = freevar p in
       let ctx =
         List.fold_left
@@ -490,23 +491,22 @@ let rec infer ctx e =
           vars
       in
       let ctx, pt, subst' = infer ctx p in
-      let subst = compose_subst subst1 subst' in
+      let subst = compose_subst subst subst' in
       let subst' = unify [ t1, pt ] in
       let subst = compose_subst subst subst' in
       let ctx = subst_tyenv subst ctx in
-      let ctx, bt', subst_b = infer ctx b in
-      let subst = compose_subst subst subst_b in
-      let subst' = unify [ bt, bt' ] in
-      let subst_b = compose_subst subst_b subst' in
+      let ctx, bt', subst' = infer ctx b in
       let subst = compose_subst subst subst' in
+      let subst' = unify [ bt, bt' ] in
+      let subst = compose_subst subst subst' in
+      let t1 = subst_ty subst t1 in
       let bt = subst_ty subst bt in
       let tenv = List.fold_left (fun tenv var -> remove tenv var) ctx.tenv vars in
-      let subst = compose_subst subst1 subst_b in
       subst, { ctx with tenv }, bt, t1
     in
-    let ctx, t1, subst1 = infer ctx e1 in
+    let ctx, t1, subst = infer ctx e1 in
     let ctx, bt = new_typevar ctx in
-    let subst, ctx, bt, _ = List.fold_left loop (subst1, ctx, bt, t1) cases in
+    let subst, ctx, bt, _ = List.fold_left loop (subst, ctx, bt, t1) cases in
     let ctx = subst_tyenv subst ctx in
     ctx, bt, subst
   | Empty ->
