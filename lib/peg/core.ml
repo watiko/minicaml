@@ -3,21 +3,40 @@ module MC = Monad.Core
 module Monad = MC.Monad
 
 module ParseResult = struct
-  include MC.OptionT.Make (MC.Identity)
+  module T = struct
+    type t = string
+  end
 
-  let run m = MC.Identity.run @@ runOptionT m
+  include MC.EitherT.Make (T) (MC.Identity)
+
+  let run m = MC.Identity.run @@ runEitherT m
+
+  let empty () : 'a m =
+    let mempty = "" in
+    Error mempty
+  ;;
+
+  let either mx my =
+    let mappend x y = x ^ " : " ^ y in
+    let append_left e r = Result.map_error (fun v -> mappend v e) r in
+    match mx with
+    | Ok x -> Ok x
+    | Error e -> (append_left e) my
+  ;;
 end
 
 module Parser = struct
-  include MC.StateT.Make
-            (struct
-              type t = char list
-            end)
-            (ParseResult)
+  module T = struct
+    type t = char list
+  end
+
+  include MC.StateT.Make (T) (ParseResult)
 
   let run m s = ParseResult.run @@ runStateT m s
-  let either xp yp s = ParseResult.either (xp s) (yp s)
-  let empty () _s = ParseResult.empty ()
+  let either xp yp : 'a m = fun s -> ParseResult.either (xp s) (yp s)
+  let empty () : 'a m = fun _ -> ParseResult.empty ()
+  let chatchError m f = lift @@ ParseResult.catchError m f
+  let throwError e = lift @@ ParseResult.throwError e
 end
 
 open Parser.Syntax
@@ -41,15 +60,15 @@ let optional p = option None (p >>= fun x -> pure @@ Some x)
 (* and-predicate:  &e *)
 let andP p cs =
   match p cs with
-  | None -> None
-  | Some _ -> Some ((), cs)
+  | Error _ -> Error "fail andP"
+  | Ok _ -> Ok ((), cs)
 ;;
 
 (* not-predicate:  !e *)
 let notP p cs =
   match p cs with
-  | None -> Some ((), cs)
-  | Some _ -> None
+  | Error _ -> Ok ((), cs)
+  | Ok _ -> Error "fail notP"
 ;;
 
 (* derived *)
@@ -60,19 +79,19 @@ let choice ps = List.fold_right ( <|> ) ps (empty ())
 
 let parse p cs =
   match p cs with
-  | None -> None
-  | Some (x, _) -> Some x
+  | Error _ -> None
+  | Ok (x, _) -> Some x
 ;;
 
 (* parser *)
 
 let item cs =
   match cs with
-  | [] -> None
-  | c :: cs' -> Some (c, cs')
+  | [] -> Error ""
+  | c :: cs' -> Ok (c, cs')
 ;;
 
-let%test _ = Some ('a', [ 'b'; 'c' ]) = Parser.run item @@ explode "abc"
+let%test _ = Ok ('a', [ 'b'; 'c' ]) = Parser.run item @@ explode "abc"
 
 let%test _ =
   let p =
@@ -80,7 +99,7 @@ let%test _ =
     let* c2 = item in
     pure (implode [ c1; c2 ])
   in
-  Some ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test _ =
@@ -88,12 +107,12 @@ let%test _ =
     item >>= fun c1 ->
     item >>= fun c2 -> pure (implode [ c1; c2 ])
   in
-  Some ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test _ =
   let p = (fun x y -> implode [ x; y ]) <$> item <*> item in
-  Some ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test _ =
@@ -102,12 +121,12 @@ let%test _ =
     and+ c2 = item in
     implode [ c1; c2 ]
   in
-  Some ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test "middle" =
   let p = item *> item <* item in
-  Some ('b', []) = Parser.run p @@ explode "abc"
+  Ok ('b', []) = Parser.run p @@ explode "abc"
 ;;
 
 let satisfy f =
@@ -116,8 +135,8 @@ let satisfy f =
 ;;
 
 let eof x = function
-  | [] -> Some (x, [])
-  | _ -> None
+  | [] -> Ok (x, [])
+  | _ -> Error "expected eof"
 ;;
 
 let char c = satisfy (( = ) c)
@@ -147,12 +166,12 @@ let string s =
 
 let%test "string" =
   let p = string "abc" in
-  Some ("abc", []) = Parser.run p @@ explode "abc"
+  Ok ("abc", []) = Parser.run p @@ explode "abc"
 ;;
 
 let token p = p <* wss
 
 let%test "grammer" =
   let p = wss *> token item <* eof () in
-  Some ('1', []) = Parser.run p @@ explode " 1 "
+  Ok ('1', []) = Parser.run p @@ explode " 1 "
 ;;
