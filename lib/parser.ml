@@ -1,4 +1,5 @@
 open Peg.Core
+open Parser.Syntax
 open Syntax
 
 (* === utils === *)
@@ -325,3 +326,4 @@ let exp = exp ()
 let pattern = pattern ()
 let cases = cases ()
 let main = wss *> token exp <* eof ()
+let main = Parser.run main
