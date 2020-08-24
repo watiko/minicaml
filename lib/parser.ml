@@ -45,7 +45,7 @@ let escape =
 
 let regularchar =
   let c =
-    let* c = notP (choice [ char '\\'; char '"'; char '\''; char '\n' ]) *> item in
+    let* c = notP (choice [ char '\\'; char '"'; char '\''; char '\n' ]) *> item () in
     pure @@ Peg.Utils.implode [ c ]
   in
   escape <|> c

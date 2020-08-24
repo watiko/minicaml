@@ -33,10 +33,14 @@ module Parser = struct
   include MC.StateT.Make (T) (ParseResult)
 
   let run m s = ParseResult.run @@ runStateT m s
+  let foldF m fa fb : 'a m = fun s -> ParseResult.foldF (m s) fa fb
   let either xp yp : 'a m = fun s -> ParseResult.either (xp s) (yp s)
   let empty () : 'a m = fun _ -> ParseResult.empty ()
-  let chatchError m f = lift @@ ParseResult.catchError m f
-  let throwError e = lift @@ ParseResult.throwError e
+  let throwError e : 'a m = lift @@ ParseResult.throwError e
+
+  (* state op *)
+  let getBuffer () : 'a m = get ()
+  let putBuffer s : 'a m = put s
 end
 
 open Parser.Syntax
@@ -58,17 +62,21 @@ let option default p = p <|> pure default
 let optional p = option None (p >>= fun x -> pure @@ Some x)
 
 (* and-predicate:  &e *)
-let andP p cs =
-  match p cs with
-  | Error _ -> Error "fail andP"
-  | Ok _ -> Ok ((), cs)
+let andP (p : 'a parser) : unit parser =
+  let* s = Parser.getBuffer () in
+  Parser.foldF
+    p
+    (fun _ -> ParseResult.pure ((), s))
+    (fun _ -> ParseResult.throwError "andP: fail")
 ;;
 
 (* not-predicate:  !e *)
-let notP p cs =
-  match p cs with
-  | Error _ -> Ok ((), cs)
-  | Ok _ -> Error "fail notP"
+let notP (p : 'a parser) : unit parser =
+  let* s = Parser.get () in
+  Parser.foldF
+    p
+    (fun _ -> ParseResult.throwError "notP: fail")
+    (fun _ -> ParseResult.pure ((), s))
 ;;
 
 (* derived *)
@@ -78,25 +86,27 @@ let choice ps = List.fold_right ( <|> ) ps (empty ())
 (* utils *)
 
 let parse p cs =
-  match p cs with
+  let r = Parser.run p cs in
+  match r with
   | Error _ -> None
   | Ok (x, _) -> Some x
 ;;
 
 (* parser *)
 
-let item cs =
+let item () =
+  let* cs = Parser.getBuffer () in
   match cs with
-  | [] -> Error ""
-  | c :: cs' -> Ok (c, cs')
+  | [] -> Parser.throwError "item: no buffer left"
+  | c :: cs' -> Parser.putBuffer cs' >>= fun _ -> Parser.pure c
 ;;
 
-let%test _ = Ok ('a', [ 'b'; 'c' ]) = Parser.run item @@ explode "abc"
+let%test _ = Ok ('a', [ 'b'; 'c' ]) = Parser.run (item ()) @@ explode "abc"
 
 let%test _ =
   let p =
-    let* c1 = item in
-    let* c2 = item in
+    let* c1 = item () in
+    let* c2 = item () in
     pure (implode [ c1; c2 ])
   in
   Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
@@ -104,39 +114,41 @@ let%test _ =
 
 let%test _ =
   let p =
-    item >>= fun c1 ->
-    item >>= fun c2 -> pure (implode [ c1; c2 ])
+    item () >>= fun c1 ->
+    item () >>= fun c2 -> pure (implode [ c1; c2 ])
   in
   Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test _ =
-  let p = (fun x y -> implode [ x; y ]) <$> item <*> item in
+  let p = (fun x y -> implode [ x; y ]) <$> item () <*> item () in
   Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test _ =
   let p =
-    let+ c1 = item
-    and+ c2 = item in
+    let+ c1 = item ()
+    and+ c2 = item () in
     implode [ c1; c2 ]
   in
   Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
 ;;
 
 let%test "middle" =
-  let p = item *> item <* item in
+  let p = item () *> item () <* item () in
   Ok ('b', []) = Parser.run p @@ explode "abc"
 ;;
 
 let satisfy f =
-  let* c = item in
+  let* c = item () in
   if f c then pure c else empty ()
 ;;
 
-let eof x = function
-  | [] -> Ok (x, [])
-  | _ -> Error "expected eof"
+let eof x =
+  let* cs = Parser.getBuffer () in
+  match cs with
+  | [] -> pure x
+  | _ -> Parser.throwError "expected eof"
 ;;
 
 let char c = satisfy (( = ) c)
@@ -172,6 +184,6 @@ let%test "string" =
 let token p = p <* wss
 
 let%test "grammer" =
-  let p = wss *> token item <* eof () in
+  let p = wss *> token (item ()) <* eof () in
   Ok ('1', []) = Parser.run p @@ explode " 1 "
 ;;
