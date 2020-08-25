@@ -2,45 +2,79 @@ open Utils
 module MC = Monad.Core
 module Monad = MC.Monad
 
-module ParseResult = struct
-  module T = struct
-    type t = string
-  end
+module Pos = struct
+  type t =
+    { line : int
+    ; column : int
+    }
 
-  include MC.EitherT.Make (T) (MC.Identity)
+  let make line column = { line; column }
+  let initialPos = { line = 1; column = 1 }
 
-  let run m = MC.Identity.run @@ runEitherT m
-
-  let empty () : 'a m =
-    let mempty = "" in
-    Error mempty
+  let updatePosChar pos c =
+    match c with
+    | '\n' | 'r' -> { line = pos.line + 1; column = 1 }
+    | _ -> { pos with column = pos.column + 1 }
   ;;
 
+  let updatePosString pos s =
+    let chars = explode s in
+    List.fold_left updatePosChar pos chars
+  ;;
+
+  let show pos = Fmt.str "Pos { line: %d, column: %d }" pos.line pos.column
+end
+
+module ParseError = struct
+  type t = string * Pos.t
+
+  let make message pos : t = message, pos
+  let errorMessage (message, _) : string = message
+  let errorPos (_, pos) : Pos.t = pos
+  let empty () = "", Pos.initialPos
+  let show (mes, pos) = Fmt.str "ParseError: %s at %s" mes (Pos.show pos)
+end
+
+module ParseResult = struct
+  include MC.EitherT.Make (ParseError) (MC.Identity)
+
+  let run m = MC.Identity.run @@ runEitherT m
+  let empty () : 'a m = Error (ParseError.empty ())
+
   let either mx my =
-    let mappend x y = x ^ " : " ^ y in
-    let append_left e r = Result.map_error (fun v -> mappend v e) r in
-    match mx with
+    match mx () with
     | Ok x -> Ok x
-    | Error e -> (append_left e) my
+    | Error _ -> my ()
   ;;
 end
 
-module Parser = struct
-  module T = struct
-    type t = char list
-  end
+module ParserState = struct
+  type t = char list * Pos.t
 
-  include MC.StateT.Make (T) (ParseResult)
+  let show (cs, pos) = Fmt.str "%s\n%s" (Pos.show pos) (implode cs)
+end
+
+module Parser = struct
+  include MC.StateT.Make (ParserState) (ParseResult)
 
   let run m s = ParseResult.run @@ runStateT m s
   let foldF m fa fb : 'a m = fun s -> ParseResult.foldF (m s) fa fb
-  let either xp yp : 'a m = fun s -> ParseResult.either (xp s) (yp s)
+  let either xp yp : 'a m = fun s -> ParseResult.either (fun () -> xp s) (fun () -> yp s)
   let empty () : 'a m = fun _ -> ParseResult.empty ()
   let throwError e : 'a m = lift @@ ParseResult.throwError e
 
   (* state op *)
-  let getBuffer () : 'a m = get ()
-  let putBuffer s : 'a m = put s
+  open Syntax
+
+  let getBuffer () : 'a m = fst <$> get ()
+  let getPos () : 'a m = snd <$> get ()
+  let putBuffer cs : 'a m = update (fun (_, pos) -> cs, pos)
+  let putPos pos : 'a m = update (fun (cs, _) -> cs, pos)
+
+  let fail message =
+    let* pos = getPos () in
+    throwError (ParseError.make message pos)
+  ;;
 end
 
 open Parser.Syntax
@@ -63,19 +97,21 @@ let optional p = option None (p >>= fun x -> pure @@ Some x)
 
 (* and-predicate:  &e *)
 let andP (p : 'a parser) : unit parser =
-  let* s = Parser.getBuffer () in
+  let* s = Parser.get () in
+  let* pos = Parser.getPos () in
   Parser.foldF
     p
     (fun _ -> ParseResult.pure ((), s))
-    (fun _ -> ParseResult.throwError "andP: fail")
+    (fun _ -> ParseResult.throwError @@ ParseError.make "andP: fail" pos)
 ;;
 
 (* not-predicate:  !e *)
 let notP (p : 'a parser) : unit parser =
   let* s = Parser.get () in
+  let* pos = Parser.getPos () in
   Parser.foldF
     p
-    (fun _ -> ParseResult.throwError "notP: fail")
+    (fun _ -> ParseResult.throwError @@ ParseError.make "notP: fail" pos)
     (fun _ -> ParseResult.pure ((), s))
 ;;
 
@@ -85,8 +121,10 @@ let choice ps = List.fold_right ( <|> ) ps (empty ())
 
 (* utils *)
 
+let runParser p s = Parser.run p (explode s, Pos.initialPos)
+
 let parse p cs =
-  let r = Parser.run p cs in
+  let r = Parser.run p (cs, Pos.initialPos) in
   match r with
   | Error _ -> None
   | Ok (x, _) -> Some x
@@ -96,12 +134,16 @@ let parse p cs =
 
 let item () =
   let* cs = Parser.getBuffer () in
+  let* pos = Parser.getPos () in
   match cs with
-  | [] -> Parser.throwError "item: no buffer left"
-  | c :: cs' -> Parser.putBuffer cs' >>= fun _ -> Parser.pure c
+  | [] -> Parser.fail "item: no buffer left"
+  | c :: cs' ->
+    let* _ = Parser.putBuffer cs' in
+    let* _ = Parser.putPos (Pos.updatePosChar pos c) in
+    Parser.pure c
 ;;
 
-let%test _ = Ok ('a', [ 'b'; 'c' ]) = Parser.run (item ()) @@ explode "abc"
+let%test _ = Ok ('a', ([ 'b'; 'c' ], Pos.make 1 2)) = runParser (item ()) "abc"
 
 let%test _ =
   let p =
@@ -109,7 +151,7 @@ let%test _ =
     let* c2 = item () in
     pure (implode [ c1; c2 ])
   in
-  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
 ;;
 
 let%test _ =
@@ -117,12 +159,12 @@ let%test _ =
     item () >>= fun c1 ->
     item () >>= fun c2 -> pure (implode [ c1; c2 ])
   in
-  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
 ;;
 
 let%test _ =
   let p = (fun x y -> implode [ x; y ]) <$> item () <*> item () in
-  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
 ;;
 
 let%test _ =
@@ -131,12 +173,12 @@ let%test _ =
     and+ c2 = item () in
     implode [ c1; c2 ]
   in
-  Ok ("ab", [ 'c' ]) = Parser.run p @@ explode "abc"
+  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
 ;;
 
 let%test "middle" =
   let p = item () *> item () <* item () in
-  Ok ('b', []) = Parser.run p @@ explode "abc"
+  Ok ('b', ([], Pos.make 1 4)) = runParser p "abc"
 ;;
 
 let satisfy f =
@@ -148,7 +190,7 @@ let eof x =
   let* cs = Parser.getBuffer () in
   match cs with
   | [] -> pure x
-  | _ -> Parser.throwError "expected eof"
+  | _ -> Parser.fail "expected eof"
 ;;
 
 let char c = satisfy (( = ) c)
@@ -178,12 +220,12 @@ let string s =
 
 let%test "string" =
   let p = string "abc" in
-  Ok ("abc", []) = Parser.run p @@ explode "abc"
+  Ok ("abc", ([], Pos.make 1 4)) = runParser p "abc"
 ;;
 
 let token p = p <* wss
 
 let%test "grammer" =
   let p = wss *> token (item ()) <* eof () in
-  Ok ('1', []) = Parser.run p @@ explode " 1 "
+  Ok ('1', ([], Pos.make 1 4)) = runParser p " 1 "
 ;;

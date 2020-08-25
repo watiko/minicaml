@@ -250,5 +250,6 @@ module StateT = struct
     let runStateT (m : 'a m) (s : state) : ('a * state) B.m = m s
     let get () : 'a m = fun s -> B.pure (s, s)
     let put s _ = B.pure ((), s)
+    let update (f : state -> state) : 'a m = fun s -> B.pure ((), f s)
   end
 end
