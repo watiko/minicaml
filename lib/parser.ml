@@ -1,4 +1,5 @@
 open Peg.Core
+open Parser.Syntax
 open Syntax
 
 (* === utils === *)
@@ -44,7 +45,7 @@ let escape =
 
 let regularchar =
   let c =
-    let* c = notP (choice [ char '\\'; char '"'; char '\''; char '\n' ]) *> item in
+    let* c = notP (choice [ char '\\'; char '"'; char '\''; char '\n' ]) *> item () in
     pure @@ Peg.Utils.implode [ c ]
   in
   escape <|> c
@@ -325,3 +326,4 @@ let exp = exp ()
 let pattern = pattern ()
 let cases = cases ()
 let main = wss *> token exp <* eof ()
+let main = Parser.run main
