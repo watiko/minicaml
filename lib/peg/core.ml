@@ -143,44 +143,6 @@ let item () =
     Parser.pure c
 ;;
 
-let%test _ = Ok ('a', ([ 'b'; 'c' ], Pos.make 1 2)) = runParser (item ()) "abc"
-
-let%test _ =
-  let p =
-    let* c1 = item () in
-    let* c2 = item () in
-    pure (implode [ c1; c2 ])
-  in
-  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
-;;
-
-let%test _ =
-  let p =
-    item () >>= fun c1 ->
-    item () >>= fun c2 -> pure (implode [ c1; c2 ])
-  in
-  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
-;;
-
-let%test _ =
-  let p = (fun x y -> implode [ x; y ]) <$> item () <*> item () in
-  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
-;;
-
-let%test _ =
-  let p =
-    let+ c1 = item ()
-    and+ c2 = item () in
-    implode [ c1; c2 ]
-  in
-  Ok ("ab", ([ 'c' ], Pos.make 1 3)) = runParser p "abc"
-;;
-
-let%test "middle" =
-  let p = item () *> item () <* item () in
-  Ok ('b', ([], Pos.make 1 4)) = runParser p "abc"
-;;
-
 let satisfy f =
   let* c = item () in
   if f c then pure c else empty ()
@@ -218,14 +180,4 @@ let string s =
   explode s |> f |> fmap implode
 ;;
 
-let%test "string" =
-  let p = string "abc" in
-  Ok ("abc", ([], Pos.make 1 4)) = runParser p "abc"
-;;
-
 let token p = p <* wss
-
-let%test "grammer" =
-  let p = wss *> token (item ()) <* eof () in
-  Ok ('1', ([], Pos.make 1 4)) = runParser p " 1 "
-;;
