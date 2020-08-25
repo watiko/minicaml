@@ -4,6 +4,7 @@ open Syntax
 
 (* === utils === *)
 
+let run = Peg.Core.runParser
 let parse = Peg.Core.parse
 let explode = Peg.Utils.explode
 let implode = Peg.Utils.implode
