@@ -98,7 +98,9 @@ let test_string_basic () =
   let testChar = test (fun c -> implode [ c ]) in
   let () =
     let p = string "abc" in
-    testString "string" (Ok ("abc", ([], Pos.make 1 4))) @@ runParser p "abc"
+    testString "string" (Ok ("abc", ([], Pos.make 1 4))) @@ runParser p "abc";
+    testString "string: fail" (Error (ParseError.make "Expected abc" Pos.initialPos))
+    @@ runParser p "xyz"
   in
   let () =
     let p = wss *> token (item ()) <* eof () in

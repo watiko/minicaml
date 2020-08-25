@@ -39,6 +39,7 @@ let escape =
       ; char 't' *> pure '\t'
       ; char 'r' *> pure '\r'
       ]
+    <?> "escape sequence"
   in
   pure @@ Peg.Utils.implode [ escaped ]
 ;;
@@ -199,7 +200,7 @@ let rec exp () =
     let* cs = token cases in
     pure @@ Match (e, cs)
   in
-  choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ]
+  choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ] <?> "(, fun, let, if, match"
 
 and prefix () = infix0 ()
 
@@ -296,13 +297,13 @@ and pattern_inner () = literalP ()
 and literalP () =
   let list = pure () >>= list in
   choice
-    [ (fun v -> Var v) <$> var
-    ; (fun i -> IntLit i) <$> int
-    ; (fun b -> BoolLit b) <$> bool
-    ; (fun s -> StrLit s) <$> stringLit
-    ; unitP
-    ; empty_list
-    ; list
+    [ (fun v -> Var v) <$> var <?> "variable"
+    ; (fun i -> IntLit i) <$> int <?> "number"
+    ; (fun b -> BoolLit b) <$> bool <?> "true or false"
+    ; (fun s -> StrLit s) <$> stringLit <?> "string"
+    ; unitP <?> "unit"
+    ; empty_list <?> "[]"
+    ; list <?> "list"
     ]
 
 and list () =

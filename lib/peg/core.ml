@@ -117,7 +117,17 @@ let notP (p : 'a parser) : unit parser =
 
 (* derived *)
 
-let choice ps = List.fold_right ( <|> ) ps (empty ())
+let choice ps =
+  let rec fold_right1 f = function
+    | [] -> invalid_arg "fold_right1"
+    | [ x ] -> x
+    | x :: xs -> f x (fold_right1 f xs)
+  in
+  fold_right1 ( <|> ) ps
+;;
+
+let withErrorMessage p msg = p <|> Parser.fail ("Expected " ^ msg)
+let ( <?> ) = withErrorMessage
 
 (* utils *)
 
@@ -145,30 +155,32 @@ let item () =
 
 let satisfy f =
   let* c = item () in
-  if f c then pure c else empty ()
+  if f c
+  then pure c
+  else Parser.fail @@ Fmt.str "satisfy: char %c did not satisfy predicate" c
 ;;
 
 let eof x =
   let* cs = Parser.getBuffer () in
   match cs with
   | [] -> pure x
-  | _ -> Parser.fail "expected eof"
+  | _ -> Parser.fail "Expected EOF"
 ;;
 
-let char c = satisfy (( = ) c)
-let range l r = satisfy (fun c -> l <= c && c <= r)
-let one_of cs = satisfy (fun c -> List.mem c cs)
-let none_of cs = satisfy (fun c -> not @@ List.mem c cs)
+let char c = satisfy (( = ) c) <?> implode [ c ]
+let range l r = satisfy (fun c -> l <= c && c <= r) <?> Fmt.str "range of %c to %c" l r
+let one_of cs = satisfy (fun c -> List.mem c cs) <?> "one of " ^ implode cs
+let none_of cs = satisfy (fun c -> not @@ List.mem c cs) <?> "none of " ^ implode cs
 
 (* char *)
 
 let lower = range 'a' 'z'
 let upper = range 'A' 'Z'
 let digit = range '0' '9'
-let letter = lower <|> upper
-let alnum = letter <|> digit
-let ws = one_of [ ' '; '\t'; '\r'; '\n' ]
-let wss = many ws
+let letter = lower <|> upper <?> "a-zA-Z"
+let alnum = letter <|> digit <?> "a-zA-Z0-9"
+let ws = one_of [ ' '; '\t'; '\r'; '\n' ] <?> "whitespace"
+let wss = many ws <?> "white spaces"
 
 (* string *)
 
@@ -177,7 +189,8 @@ let string s =
     | [] -> pure []
     | c :: cs -> char c *> f cs *> pure (c :: cs)
   in
-  explode s |> f |> fmap implode
+  let p = explode s |> f |> fmap implode in
+  withErrorMessage p s
 ;;
 
 let token p = p <* wss
