@@ -103,7 +103,7 @@ let test_string_basic () =
     @@ runParser p "xyz"
   in
   let () =
-    let p = wss *> token (item ()) <* eof () in
+    let p = ows *> token (item ()) <* eof () in
     testChar "grammer" (Ok ('1', ([], Pos.make 1 4))) @@ runParser p " 1 "
   in
   ()

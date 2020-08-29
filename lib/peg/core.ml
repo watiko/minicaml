@@ -180,7 +180,8 @@ let digit = range '0' '9'
 let letter = lower <|> upper <?> "a-zA-Z"
 let alnum = letter <|> digit <?> "a-zA-Z0-9"
 let ws = one_of [ ' '; '\t'; '\r'; '\n' ] <?> "whitespace"
-let wss = many ws <?> "white spaces"
+let rws = many1 ws <?> "white spaces"
+let ows = many ws <?> "white spaces"
 
 (* string *)
 
@@ -193,4 +194,4 @@ let string s =
   withErrorMessage p s
 ;;
 
-let token p = p <* wss
+let token p = p <* rws
