@@ -15,9 +15,20 @@ module ResultSyntax = struct
 end
 
 let parseResult s =
-  match Parser.(parse main (explode s)) with
-  | None -> Error "parse failed"
-  | Some e -> Ok e
+  let getLine s line =
+    let lines = String.split_on_char '\n' s in
+    List.nth lines (line - 1)
+  in
+  let pointedLine column =
+    let char n = if n = column - 1 then '^' else ' ' in
+    String.init column char
+  in
+  match Parser.(run main s) with
+  | Error (message, pos) ->
+    let line = getLine s pos.line in
+    let pointed = pointedLine pos.column in
+    Error (Fmt.str "parse failed: %s\n|%s\n|%s" message line pointed)
+  | Ok (x, _) -> Ok x
 ;;
 
 let inferResult e =
@@ -38,7 +49,7 @@ let run s =
   pure (v, t)
 ;;
 
-let eat_script () =
+let rec eat_script () =
   let buffer = ref "" in
   let next = ref true in
   let terminate = Str.regexp_string ";;" in
@@ -62,7 +73,7 @@ let eat_script () =
       ()
     done
   in
-  !buffer
+  if not (!buffer = "") then !buffer else eat_script ()
 ;;
 
 let () =

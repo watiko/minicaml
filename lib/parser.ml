@@ -4,6 +4,7 @@ open Syntax
 
 (* === utils === *)
 
+let run = Peg.Core.runParser
 let parse = Peg.Core.parse
 let explode = Peg.Utils.explode
 let implode = Peg.Utils.implode
@@ -39,6 +40,7 @@ let escape =
       ; char 't' *> pure '\t'
       ; char 'r' *> pure '\r'
       ]
+    <?> "escape sequence"
   in
   pure @@ Peg.Utils.implode [ escaped ]
 ;;
@@ -142,8 +144,8 @@ let int =
   pure value
 ;;
 
-let empty_list = lbra *> wss *> rbra *> pure Empty
-let unitP = lparen *> wss *> rparen *> pure Unit
+let empty_list = lbra *> ows *> rbra *> pure Empty
+let unitP = lparen *> ows *> rparen *> pure Unit
 
 let stringLit =
   let* ss = string "\"" *> many (regularchar <|> string "'") <* string "\"" in
@@ -160,7 +162,7 @@ let rec exp () =
     let* _ = token funP in
     let* x = token var in
     let* _ = token arrow in
-    let* e = token exp in
+    let* e = exp in
     pure @@ Fun (x, e)
   in
   let letP' =
@@ -169,7 +171,7 @@ let rec exp () =
     let* _ = token equal in
     let* e1 = token exp in
     let* _ = token inP in
-    let* e2 = token exp in
+    let* e2 = exp in
     pure @@ Let (x, e1, e2)
   in
   let letRecP =
@@ -180,7 +182,7 @@ let rec exp () =
     let* _ = token equal in
     let* e1 = token exp in
     let* _ = token inP in
-    let* e2 = token exp in
+    let* e2 = exp in
     pure @@ LetRec (n, x, e1, e2)
   in
   let ifP' =
@@ -189,17 +191,17 @@ let rec exp () =
     let* _ = token thenP in
     let* e1 = token exp in
     let* _ = token elseP in
-    let* e2 = token exp in
+    let* e2 = exp in
     pure @@ If (ce, e1, e2)
   in
   let matchP' =
     let* _ = token matchP in
     let* e = token exp in
     let* _ = token withP in
-    let* cs = token cases in
+    let* cs = cases in
     pure @@ Match (e, cs)
   in
-  choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ]
+  choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ] <?> "(, fun, let, if, match"
 
 and prefix () = infix0 ()
 
@@ -212,8 +214,8 @@ and infix0 () =
     | Token.Less -> Less (e1, e2)
     | Token.Greater -> Greater (e1, e2)
   in
-  let* e1 = token infix1 in
-  let* es = many (pair <$> token infix0op <*> token infix1) in
+  let* e1 = infix1 in
+  let* es = many (pair <$> ows *> infix0op <*> ows *> infix1) in
   pure @@ List.fold_left f e1 es
 
 and infix1 () =
@@ -224,8 +226,8 @@ and infix1 () =
     match op with
     | Token.Colcol -> Cons (e2, e1)
   in
-  let* e1 = token infix2 in
-  let* es = many (pair <$> token infix1opR <*> token infix1) in
+  let* e1 = infix2 in
+  let* es = many (pair <$> ows *> infix1opR <*> ows *> infix1) in
   pure @@ List.fold_right f es e1
 
 and infix2 () =
@@ -236,8 +238,8 @@ and infix2 () =
     | Token.Plus -> Plus (e1, e2)
     | Token.Minus -> Minus (e1, e2)
   in
-  let* e1 = token infix3 in
-  let* es = many (pair <$> token infix2op <*> token infix3) in
+  let* e1 = infix3 in
+  let* es = many (pair <$> ows *> infix2op <*> ows *> infix3) in
   pure @@ List.fold_left f e1 es
 
 and infix3 () =
@@ -248,15 +250,15 @@ and infix3 () =
     | Token.Asterisk -> Times (e1, e2)
     | Token.Slash -> Div (e1, e2)
   in
-  let* e1 = token infix4 in
-  let* es = many (pair <$> token infix3op <*> token infix4) in
+  let* e1 = infix4 in
+  let* es = many (pair <$> ows *> infix3op <*> ows *> infix4) in
   pure @@ List.fold_left f e1 es
 
 and infix4 () =
   let priexp = pure () >>= priexp in
   let apply =
-    let* fn = token priexp in
-    let* es = many1 (token priexp) in
+    let* fn = priexp in
+    let* es = many1 (rws *> priexp) in
     pure @@ List.fold_left (fun e1 e2 -> App (e1, e2)) fn es
   in
   apply <|> priexp
@@ -264,7 +266,7 @@ and infix4 () =
 and priexp () =
   let exp = pure () >>= exp in
   let literalP = pure () >>= literalP in
-  literalP <|> (lparen *> token exp <* rparen)
+  literalP <|> (lparen *> ows *> exp <* ows <* rparen)
 
 and cases () =
   let exp = pure () >>= exp in
@@ -272,18 +274,18 @@ and cases () =
   let single_pair =
     let* e1 = token pattern in
     let* _ = token arrow in
-    let* e2 = token exp in
+    let* e2 = exp in
     pure (e1, e2)
   in
   let single = List.cons <$> single_pair <*> pure [] in
-  let multiple = many1 (token vbar *> single_pair) in
+  let multiple = many1 (ows *> vbar *> ows *> single_pair) in
   single <|> multiple
 
 and pattern () =
   let pattern = pure () >>= pattern in
   let pattern_inner = pure () >>= pattern_inner in
-  let* p = token pattern_inner in
-  let* ps = many (token colcol *> token pattern) in
+  let* p = pattern_inner in
+  let* ps = many (ows *> colcol *> ows *> pattern) in
   match ps with
   | [] -> pure p
   | _ ->
@@ -296,22 +298,22 @@ and pattern_inner () = literalP ()
 and literalP () =
   let list = pure () >>= list in
   choice
-    [ (fun v -> Var v) <$> var
-    ; (fun i -> IntLit i) <$> int
-    ; (fun b -> BoolLit b) <$> bool
-    ; (fun s -> StrLit s) <$> stringLit
-    ; unitP
-    ; empty_list
-    ; list
+    [ (fun v -> Var v) <$> var <?> "variable"
+    ; (fun i -> IntLit i) <$> int <?> "number"
+    ; (fun b -> BoolLit b) <$> bool <?> "true or false"
+    ; (fun s -> StrLit s) <$> stringLit <?> "string"
+    ; unitP <?> "unit"
+    ; empty_list <?> "[]"
+    ; list <?> "list"
     ]
 
 and list () =
   let exp = pure () >>= exp in
-  let* _ = token lbra in
-  let* e = token exp in
-  let* es = many (token semicol *> token exp) in
-  let* _ = optional @@ token semicol in
-  let* _ = token rbra in
+  let* _ = lbra <* ows in
+  let* e = exp in
+  let* es = many (ows *> semicol *> ows *> exp) in
+  let* _ = optional @@ (ows *> semicol) in
+  let* _ = ows *> rbra in
   match es with
   | [] -> pure @@ Cons (e, Empty)
   | _ ->
@@ -325,5 +327,5 @@ and list () =
 let exp = exp ()
 let pattern = pattern ()
 let cases = cases ()
-let main = wss *> token exp <* eof ()
+let main = ows *> exp <* ows <* eof ()
 let main = Parser.run main
