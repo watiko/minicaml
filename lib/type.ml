@@ -82,22 +82,14 @@ let lookup_by_age tvar subst =
   List.find_map (fun (tvar, ty) -> if age = Tyvar.age tvar then Some ty else None) subst
 ;;
 
-let remove tenv x =
-  let rec remove tenv x k =
-    match tenv with
-    | [] -> k []
-    | (tx, _) :: tenv when tx = x -> k tenv
-    | h :: tenv -> remove tenv x (fun tenv -> k (h :: tenv))
-  in
-  remove tenv x (fun x -> x)
-;;
+let remove x tenv = List.remove_assoc x tenv
 
 let%test "remove" =
   let tenv = emptytenv () in
   let tenv = ext tenv "x" TInt in
-  let tenv' = ext tenv "y" TInt in
-  let tenv = ext tenv' "x" TBool in
-  remove tenv "x" = tenv'
+  let tenv = ext tenv "y" TInt in
+  let tenv' = ext tenv "x" TBool in
+  remove "x" tenv' = tenv
 ;;
 
 let defaultenv () =
@@ -120,8 +112,8 @@ let freevar e =
     match e with
     | Var x -> k [ x ]
     | Cons (hd, tl) ->
-      freevar hd (fun vars1 ->
-          freevar tl (fun vars2 -> k @@ List.concat [ vars1; vars2 ]))
+      freevar hd @@ fun vars1 ->
+      freevar tl @@ fun vars2 -> k @@ List.concat [ vars1; vars2 ]
     | Unit | IntLit _ | BoolLit _ | StrLit _ | _ -> k []
   in
   freevar e (fun x -> x)
@@ -177,15 +169,12 @@ let substitute tvar t tenv =
 
 let occurs tx t =
   let rec occurs tx t k =
-    if tx = t
-    then k true
-    else (
-      match t with
-      | TArrow (t1, t2) ->
-        occurs tx t1 (fun r1 ->
-        occurs tx t2 (fun r2 ->
-        k (r1 || r2))) [@ocamlformat "disable"]
-      | _ -> k false)
+    match t with
+    | TArrow (t1, t2) ->
+      occurs tx t1 @@ fun r1 ->
+      occurs tx t2 @@ fun r2 -> k (r1 || r2)
+    | _ when t = tx -> k true
+    | _ -> k false
   in
   occurs tx t (fun x -> x)
 ;;
@@ -225,13 +214,9 @@ let%test "subst_ty: complex" =
 let subst_tvars (subst : tysubst) tvars =
   List.map
     (fun tvar ->
-      let substElementOpt = List.find_opt (fun (x, _) -> tvar = x) subst in
-      match substElementOpt with
-      | None -> tvar
-      | Some (_, t) ->
-        (match t with
-        | TVar y -> y
-        | _ -> tvar))
+      match List.assoc_opt tvar subst with
+      | Some (TVar y) -> y
+      | _ -> tvar)
     tvars
 ;;
 
@@ -432,7 +417,7 @@ let rec infer ctx e =
     let tenv = ext ctx.tenv x (ty_of_scheme tvar) in
     let ctx, t, subst = infer { ctx with tenv } e in
     let tvar = subst_ty subst tvar in
-    let tenv = remove ctx.tenv x in
+    let tenv = remove x ctx.tenv in
     { ctx with tenv }, TArrow (tvar, t), subst
   | App (e1, e2) ->
     let ctx, t1, subst1 = infer ctx e1 in
@@ -454,7 +439,7 @@ let rec infer ctx e =
     let subst = compose_subst subst1 subst2 in
     let t2 = subst_ty subst t2 in
     let tenv = ctx.tenv in
-    let tenv = remove tenv x in
+    let tenv = remove x tenv in
     { ctx with tenv }, t2, subst
   | LetRec (f, x, e1, e2) ->
     let ctx, tvar_fn = new_typevar ctx in
@@ -470,8 +455,8 @@ let rec infer ctx e =
     let ctx = subst_tyenv subst ctx in
     let tenv = ctx.tenv in
     let tvar_fn = subst_ty subst tvar_fn in
-    let tenv = remove tenv f in
-    let tenv = remove tenv x in
+    let tenv = remove f tenv in
+    let tenv = remove x tenv in
     let tvar_fn = generalize tvar_fn tenv in
     let tenv = ext tenv f tvar_fn in
     let ctx, t2, subst' = infer { ctx with tenv } e2 in
@@ -501,7 +486,7 @@ let rec infer ctx e =
       let subst = compose_subst subst subst' in
       let t1 = subst_ty subst t1 in
       let bt = subst_ty subst bt in
-      let tenv = List.fold_left (fun tenv var -> remove tenv var) ctx.tenv vars in
+      let tenv = List.fold_left (fun tenv var -> remove var tenv) ctx.tenv vars in
       subst, { ctx with tenv }, bt, t1
     in
     let ctx, t1, subst = infer ctx e1 in
