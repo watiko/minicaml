@@ -120,8 +120,8 @@ let freevar e =
     match e with
     | Var x -> k [ x ]
     | Cons (hd, tl) ->
-      freevar hd (fun vars1 ->
-          freevar tl (fun vars2 -> k @@ List.concat [ vars1; vars2 ]))
+      freevar hd @@ fun vars1 ->
+      freevar tl @@ fun vars2 -> k @@ List.concat [ vars1; vars2 ]
     | Unit | IntLit _ | BoolLit _ | StrLit _ | _ -> k []
   in
   freevar e (fun x -> x)
@@ -182,9 +182,8 @@ let occurs tx t =
     else (
       match t with
       | TArrow (t1, t2) ->
-        occurs tx t1 (fun r1 ->
-        occurs tx t2 (fun r2 ->
-        k (r1 || r2))) [@ocamlformat "disable"]
+        occurs tx t1 @@ fun r1 ->
+        occurs tx t2 @@ fun r2 -> k (r1 || r2)
       | _ -> k false)
   in
   occurs tx t (fun x -> x)
@@ -227,11 +226,8 @@ let subst_tvars (subst : tysubst) tvars =
     (fun tvar ->
       let substElementOpt = List.find_opt (fun (x, _) -> tvar = x) subst in
       match substElementOpt with
-      | None -> tvar
-      | Some (_, t) ->
-        (match t with
-        | TVar y -> y
-        | _ -> tvar))
+      | Some (_, TVar y) -> y
+      | _ -> tvar)
     tvars
 ;;
 
