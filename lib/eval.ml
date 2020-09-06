@@ -34,11 +34,7 @@ let defaultenv () =
   env
 ;;
 
-let rec lookup x env =
-  match env with
-  | [] -> None
-  | (y, v) :: rest -> if x = y then Some v else lookup x rest
-;;
+let lookup x env = List.assoc_opt x env
 
 let rec eval e env k =
   let binop f e1 e2 env k =
