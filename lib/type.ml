@@ -169,14 +169,12 @@ let substitute tvar t tenv =
 
 let occurs tx t =
   let rec occurs tx t k =
-    if tx = t
-    then k true
-    else (
-      match t with
-      | TArrow (t1, t2) ->
-        occurs tx t1 @@ fun r1 ->
-        occurs tx t2 @@ fun r2 -> k (r1 || r2)
-      | _ -> k false)
+    match t with
+    | TArrow (t1, t2) ->
+      occurs tx t1 @@ fun r1 ->
+      occurs tx t2 @@ fun r2 -> k (r1 || r2)
+    | _ when t = tx -> k true
+    | _ -> k false
   in
   occurs tx t (fun x -> x)
 ;;
