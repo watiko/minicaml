@@ -1,6 +1,5 @@
 (library
- (name peg)
- (libraries fmt monad complement)
+ (name complement)
  (inline_tests)
  (preprocess
   (pps ppx_inline_test)))

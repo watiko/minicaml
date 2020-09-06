@@ -3,3 +3,5 @@ let implode cs = String.init (List.length cs) (List.nth cs)
 
 let%test _ = [ 'a'; 'b'; 'c' ] = explode "abc"
 let%test _ = "abc" = implode [ 'a'; 'b'; 'c' ]
+
+let fold_right1 = Complement.Utils.fold_right1
