@@ -40,5 +40,5 @@ Firstly edit dune-project's `depends` and dune file's `libraries` then run `opam
 
 ```bash
 $ ls dune-project */dune
-$ opam lock
+$ opam lock .
 ```
