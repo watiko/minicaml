@@ -63,6 +63,12 @@ let test_basic_combinators () =
   in
   let testChar = test (fun c -> implode [ c ]) in
   let testUnit = test (fun () -> "unit") in
+  let testOption =
+    test (fun opt ->
+        match opt with
+        | None -> "none"
+        | Some c -> "some: " ^ implode [ c ])
+  in
   let () =
     let p = item () in
     testChar "just item" (Ok ('a', ([ 'b'; 'c' ], Pos.make 1 2))) @@ runParser p "abc"
@@ -82,6 +88,12 @@ let test_basic_combinators () =
     testUnit "notP: success" (Ok ((), ([ 'b' ], Pos.make 1 1))) @@ runParser p "b";
     testUnit "notP: fail" (Error (ParseError.make "notP: fail" @@ Pos.make 1 1))
     @@ runParser p "a"
+  in
+  let () =
+    let p = optional (char 'a') in
+    testOption "optional: exists" (Ok (Some 'a', ([], Pos.make 1 2))) @@ runParser p "a";
+    testOption "optional: not exists" (Ok (None, ([ 'b' ], Pos.make 1 1)))
+    @@ runParser p "b"
   in
   ()
 ;;
