@@ -395,6 +395,7 @@ let rec infer ctx e =
     binop_infer ctx e1 e2 (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TInt
   | Greater (e1, e2) | Less (e1, e2) ->
     binop_infer ctx e1 e2 (fun (t1, t2) -> [ t1, TInt; t2, TInt ]) TBool
+  | Not e1 -> prefixop_infer ctx e1 TBool TBool
   | Eq (e1, e2) -> binop_infer ctx e1 e2 (fun (t1, t2) -> [ t1, t2 ]) TBool
   | If (c, et, ef) ->
     let ctx, ct, subst = infer ctx c in
@@ -507,6 +508,13 @@ let rec infer ctx e =
     let t2 = subst_ty subst t2 in
     let ctx = subst_tyenv subst ctx in
     ctx, t2, subst
+
+and prefixop_infer ctx e1 expectedType retType =
+  let ctx, t1, subst1 = infer ctx e1 in
+  let subst2 = unify [ t1, expectedType ] in
+  let ctx = subst_tyenv subst2 ctx in
+  let subst3 = compose_subst subst1 subst2 in
+  ctx, retType, subst3
 
 and binop_infer ctx e1 e2 cmp retType =
   let ctx, t1, subst1 = infer ctx e1 in

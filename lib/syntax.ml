@@ -9,6 +9,7 @@ type exp =
   | LetRec of string * string * exp * exp
   | If of exp * exp * exp
   | Match of exp * (exp * exp) list
+  | Not of exp
   | Eq of exp * exp
   | Greater of exp * exp
   | Less of exp * exp
@@ -43,6 +44,7 @@ let exp_name = function
   | LetRec _ -> "LetRec"
   | If _ -> "If"
   | Match _ -> "Match"
+  | Not _ -> "Not"
   | Eq _ -> "Eq"
   | Greater _ -> "Greater"
   | Less _ -> "Less"
@@ -74,7 +76,7 @@ let rec pprint_exp ppf e =
   | IntLit n -> Fmt.pf ppf "%s %d" ename n
   | BoolLit b -> Fmt.pf ppf "%s %b" ename b
   | StrLit s -> Fmt.pf ppf "%s %s" ename s
-  | FailWith e -> Fmt.pf ppf "@[<v 2>%s@ %a]" ename pprint_exp e
+  | Not e | FailWith e -> Fmt.pf ppf "@[<v 2>%s@ %a]" ename pprint_exp e
   | App (e1, e2)
   | Eq (e1, e2)
   | Greater (e1, e2)

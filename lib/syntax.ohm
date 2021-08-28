@@ -14,7 +14,7 @@ MiniCaml {
     | match Exp with Cases             -- match
 
   Prefix =
-    | Infix0
+    | prefixOp? Infix0
 
   Infix0 =
     | Infix1 (infix0op Infix1)*
@@ -70,6 +70,7 @@ MiniCaml {
 
   // op
   
+  prefixOp  = not
   infix0op  = equal | less | greater
   infix1opR = colcol
   infix2op  = plus | minus
@@ -97,6 +98,7 @@ MiniCaml {
 
   // keyword
   keyword =
+    | not
     | true
     | false
     | fun
@@ -109,6 +111,7 @@ MiniCaml {
     | match
     | with
     
+  not   = "not"   ~id
   true  = "true"  ~id
   false = "false" ~id
   fun   = "fun"   ~id

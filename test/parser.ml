@@ -111,6 +111,11 @@ let test_if () =
   exp_test "simple" (If (BoolLit true, IntLit 1, IntLit 2)) "if true then 1 else 2"
 ;;
 
+let test_prefix () =
+  let open Syntax in
+  exp_test "not" (Not (BoolLit true)) "not true"
+;;
+
 let () =
   Alcotest.run
     "Parser"
@@ -123,6 +128,7 @@ let () =
         ; Alcotest.test_case "fn" `Quick test_fn
         ; Alcotest.test_case "let" `Quick test_let
         ; Alcotest.test_case "if" `Quick test_if
+        ; Alcotest.test_case "prefix" `Quick test_prefix
         ] )
     ]
 ;;

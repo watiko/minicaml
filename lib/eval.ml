@@ -74,6 +74,7 @@ let rec eval e env k =
   | Div (e1, e2) -> binop ( / ) e1 e2 env k
   | Greater (e1, e2) -> condop ( > ) e1 e2 env k
   | Less (e1, e2) -> condop ( < ) e1 e2 env k
+  | Not e1 -> not_eval e1 env k
   | Eq (e1, e2) -> eq_eval e1 e2 env k
   | If (c, e1, e2) ->
     eval c env @@ fun v1 ->
@@ -113,6 +114,12 @@ and app_eval e1 e2 env k =
     let fenv = ext fenv f fn in
     eval body fenv k
   | _ -> failwith "app: function value required"
+
+and not_eval e1 env k =
+  eval e1 env @@ fun v1 ->
+  match v1 with
+  | BoolVal b1 -> k @@ BoolVal (not b1)
+  | v1 -> failwith @@ "not: expression was not bool: " ^ value_type v1
 
 and eq_eval e1 e2 env k =
   eval e1 env @@ fun v1 ->

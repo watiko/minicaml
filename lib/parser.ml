@@ -13,6 +13,8 @@ let rec fix f x = f (fix f) x
 (* === tokens === *)
 
 module Token = struct
+  type prefixOp = Not
+
   type infix0op =
     | Equal
     | Less
@@ -59,6 +61,8 @@ let idP =
   pure @@ Peg.Utils.implode (d :: ds)
 ;;
 
+(* avoid name conflict *)
+let notParser = string "not"
 let trueP = string "true"
 let falseP = string "false"
 let funP = string "fun"
@@ -74,7 +78,8 @@ let bool = trueP *> pure true <|> falseP *> pure false
 
 let keyword =
   let px =
-    [ trueP
+    [ notParser
+    ; trueP
     ; falseP
     ; funP
     ; letP
@@ -114,6 +119,10 @@ let less = string "<"
 let greater = string ">"
 let semicol = string ";"
 let colcol = string "::"
+
+(* op relation *)
+
+let prefixOp = notParser *> pure Token.Not
 
 let infix0op =
   let open Token in
@@ -203,7 +212,15 @@ let rec exp () =
   in
   choice [ prefix; funP'; letP'; letRecP; ifP'; matchP' ] <?> "(, fun, let, if, match"
 
-and prefix () = infix0 ()
+and prefix () =
+  let infix0 = pure () >>= infix0 in
+  let* e1 = optional (prefixOp <* rws) in
+  let* e2 = infix0 in
+  pure
+  @@
+  match e1 with
+  | None -> e2
+  | Some Token.Not -> Not e2
 
 and infix0 () =
   let infix1 = pure () >>= infix1 in
