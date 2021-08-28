@@ -1,0 +1,26 @@
+{
+  "name": "minicaml",
+  "esy": {
+    "build": "dune build -p #{self.name}",
+    "buildsInSource": "_build"
+  },
+  "scripts": {
+    "watch": "dune build --watch --terminal-persistence=clear-on-rebuild",
+    "test": "dune runtest",
+    "test-fmt": "dune build @fmt",
+    "fix": "dune build @fmt --auto-promote",
+    "repl": "rlwrap dune exec minicaml"
+  },
+  "dependencies": {
+    "@opam/dune": "2.9.0",
+    "@opam/fmt": "0.8.9",
+    "@opam/ppx_inline_test": "v0.14.1",
+    "ocaml": "4.12.0"
+  },
+  "devDependencies": {
+    "@opam/alcotest": "1.4.0",
+    "@opam/ocaml-lsp-server": "1.7.0",
+    "@opam/ocamlformat": "0.19.0",
+    "@opam/ocamlformat-rpc": "0.19.0"
+  }
+}

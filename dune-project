@@ -1,4 +1,4 @@
-(lang dune 2.6)
+(lang dune 2.9)
 (name minicaml)
 
 (generate_opam_files true)
@@ -8,8 +8,8 @@
   (maintainers watiko)
   (description "study project")
   (depends
-    (ocaml (= 4.12.0))
+    ocaml
     fmt
     ppx_inline_test
-    (alcotest (and (>= 1.4.0) :with-test))
+    (alcotest :with-test)
     (ocamlformat :with-test)))

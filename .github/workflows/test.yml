@@ -7,13 +7,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: setup OCaml
-        uses: ocaml/setup-ocaml@v2
+      - uses: actions/setup-node@v2
         with:
-          ocaml-compiler: 4.12.0
-      - name: install dependencies
-        run: opam install . --deps-only --with-test
+          node-version: 14
+      - name: Install esy
+        run: npm install -g esy
+      - uses: esy/github-action@v1
+        with:
+          cache-key: ${{ hashFiles('esy.lock/index.json') }}
       - name: test
-        run: opam exec -- dune runtest
+        run: esy test
       - name: test-format
-        run: opam exec -- dune build @fmt
+        run: esy test-fmt

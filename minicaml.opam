@@ -3,15 +3,16 @@ opam-version: "2.0"
 description: "study project"
 maintainer: ["watiko"]
 depends: [
-  "dune" {>= "2.6"}
-  "ocaml" {= "4.12.0"}
+  "dune" {>= "2.9"}
+  "ocaml"
   "fmt"
   "ppx_inline_test"
-  "alcotest" {>= "1.4.0" & with-test}
+  "alcotest" {with-test}
   "ocamlformat" {with-test}
+  "odoc" {with-doc}
 ]
 build: [
-  ["dune" "subst"] {pinned}
+  ["dune" "subst" "--root" "."] {dev}
   [
     "dune"
     "build"
@@ -19,8 +20,11 @@ build: [
     name
     "-j"
     jobs
+    "--promote-install-files"
+    "false"
     "@install"
     "@runtest" {with-test}
     "@doc" {with-doc}
   ]
+  ["dune" "install" "-p" name "--create-install-files" name]
 ]
