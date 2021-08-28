@@ -22,7 +22,7 @@ jobs:
       - name: setup OCaml
         uses: avsm/setup-ocaml@v1
         with:
-          ocaml-version: 4.11.1
+          ocaml-version: 4.12.0
       - name: install dependencies
         run: opam install . --deps-only --with-doc --with-test
       - name: test

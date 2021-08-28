@@ -4,10 +4,10 @@ description: "study project"
 maintainer: ["watiko"]
 depends: [
   "dune" {>= "2.6"}
-  "ocaml" {= "4.11.1"}
+  "ocaml" {= "4.12.0"}
   "fmt"
   "ppx_inline_test"
-  "alcotest" {>= "1.2.1" & with-test}
+  "alcotest" {>= "1.4.0" & with-test}
   "ocamlformat" {with-test}
 ]
 build: [

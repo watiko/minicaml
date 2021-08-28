@@ -8,8 +8,8 @@
   (maintainers watiko)
   (description "study project")
   (depends
-    (ocaml (= 4.11.1))
+    (ocaml (= 4.12.0))
     fmt
     ppx_inline_test
-    (alcotest (and (>= 1.2.1) :with-test))
+    (alcotest (and (>= 1.4.0) :with-test))
     (ocamlformat :with-test)))
