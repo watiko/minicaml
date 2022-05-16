@@ -1,7 +1,5 @@
 let pp_parse_error ppf e = Fmt.pf ppf "%s" @@ Peg.Core.ParseError.show e
 let pp_parser_state ppf s = Fmt.pf ppf "%s" @@ Peg.Core.ParserState.show s
-let parse_error_testable = Alcotest.testable pp_parse_error ( = )
-let parser_state_testable = Alcotest.testable pp_parser_state ( = )
 
 let pp_parser_result a_show ppf r =
   let pp_a ppf a = Fmt.pf ppf "value(%s)" @@ a_show a in
