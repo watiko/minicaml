@@ -293,7 +293,7 @@ let unify eql =
         | _, TVar x -> sub x t1 eql subst
         | _, _ ->
           Error
-            (Fmt.strf
+            (Fmt.str
                "@[expected %s but got %s:@ One: %a@ Another: %a@]"
                (type_name t1)
                (type_name t2)
@@ -303,7 +303,7 @@ let unify eql =
                t2))
   and sub x t eql subst =
     if occurs (TVar x) t
-    then Error (Fmt.strf "type %s contains a reference to itself" (type_name t))
+    then Error (Fmt.str "type %s contains a reference to itself" (type_name t))
     else (
       match solve (subst_eql [ x, t ] eql) [] with
       | Ok subst' ->
