@@ -190,8 +190,8 @@ let rec subst_ty subst t =
   | TArrow (from_t, to_t) -> TArrow (subst_ty subst from_t, subst_ty subst to_t)
   | TVar x ->
     (match lookup_by_age x subst with
-    | None -> TVar x
-    | Some t -> t)
+     | None -> TVar x
+     | Some t -> t)
   | TList t -> TList (subst_ty subst t)
 ;;
 
@@ -380,10 +380,10 @@ let rec infer ctx e =
   match e with
   | Var x ->
     (match lookup x ctx.tenv with
-    | Some ts ->
-      let ctx, t = instantiate ts ctx in
-      ctx, t, esubst
-    | None -> failwith @@ "failed to lookup type of var " ^ x)
+     | Some ts ->
+       let ctx, t = instantiate ts ctx in
+       ctx, t, esubst
+     | None -> failwith @@ "failed to lookup type of var " ^ x)
   | Unit -> ctx, TUnit, esubst
   | IntLit _ -> ctx, TInt, esubst
   | BoolLit _ -> ctx, TBool, esubst

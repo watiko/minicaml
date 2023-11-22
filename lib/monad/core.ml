@@ -75,11 +75,11 @@ end
 
 module Identity = struct
   module M = Monad.Make (struct
-    type 'a m = 'a
+      type 'a m = 'a
 
-    let pure x = x
-    let bind m f = f m
-  end)
+      let pure x = x
+      let bind m f = f m
+    end)
 
   include M
 

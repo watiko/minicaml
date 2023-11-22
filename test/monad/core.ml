@@ -191,8 +191,8 @@ let test_eithert_identity () =
     let v =
       M.run
       @@ M.catchError (M.throwError (A 100)) (function
-             | A i -> M.pure i
-             | e -> M.throwError e)
+        | A i -> M.pure i
+        | e -> M.throwError e)
     in
     Alcotest.(check (result int myerror_testable)) "raise_3" (Ok 100) v
   in
