@@ -63,9 +63,9 @@ let test_basic_combinators () =
   let testUnit = test (fun () -> "unit") in
   let testOption =
     test (fun opt ->
-        match opt with
-        | None -> "none"
-        | Some c -> "some: " ^ implode [ c ])
+      match opt with
+      | None -> "none"
+      | Some c -> "some: " ^ implode [ c ])
   in
   let () =
     let p = item () in

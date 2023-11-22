@@ -54,8 +54,8 @@ let rec eval e env k =
   match e with
   | Var x ->
     (match lookup x env with
-    | Some v -> k v
-    | None -> failwith @@ "lookup failed with key: " ^ x)
+     | Some v -> k v
+     | None -> failwith @@ "lookup failed with key: " ^ x)
   | IntLit n -> k @@ IntVal n
   | BoolLit b -> k @@ BoolVal b
   | StrLit s -> k @@ StrVal s
@@ -79,27 +79,27 @@ let rec eval e env k =
   | If (c, e1, e2) ->
     eval c env @@ fun v1 ->
     (match v1 with
-    | BoolVal true -> eval e1 env k
-    | BoolVal false -> eval e2 env k
-    | v -> failwith @@ "if: cond type is not bool but got: " ^ value_type v)
+     | BoolVal true -> eval e1 env k
+     | BoolVal false -> eval e2 env k
+     | v -> failwith @@ "if: cond type is not bool but got: " ^ value_type v)
   | Unit -> k UnitVal
   | Empty -> k @@ ListVal []
   | Cons (e1, e2) ->
     eval e1 env @@ fun v1 ->
     eval e2 env @@ fun v2 ->
     (match v1, v2 with
-    | v1, ListVal v2 -> k @@ ListVal (v1 :: v2)
-    | v1, v2 ->
-      failwith
-      @@ "cons: required list type but got: "
-      ^ value_type v1
-      ^ ", "
-      ^ value_type v2)
+     | v1, ListVal v2 -> k @@ ListVal (v1 :: v2)
+     | v1, v2 ->
+       failwith
+       @@ "cons: required list type but got: "
+       ^ value_type v1
+       ^ ", "
+       ^ value_type v2)
   | FailWith e ->
     eval e env @@ fun v1 ->
     (match v1 with
-    | StrVal s -> failwith s
-    | v -> failwith @@ "failwith: required str type but got: " ^ value_type v)
+     | StrVal s -> failwith s
+     | v -> failwith @@ "failwith: required str type but got: " ^ value_type v)
   | Match (e1, cases) -> match_eval e1 cases env k
 
 and app_eval e1 e2 env k =
@@ -142,25 +142,25 @@ and match_eval e1 cases env k =
     | [] -> None
     | (e2, body) :: cases ->
       (match e2 with
-      | Cons (Var h, Empty) ->
-        (match v1 with
-        | ListVal [ hv ] ->
-          let env = ext env h hv in
-          Some (body, env)
-        | _ -> findMatch cases)
-      | Cons (Var h, Var tl) ->
-        (match v1 with
-        | ListVal (hv :: tlv) ->
-          let env = ext env h hv in
-          let env = ext env tl (ListVal tlv) in
-          Some (body, env)
-        | _ -> findMatch cases)
-      | Var x ->
-        let env = ext env x v1 in
-        Some (body, env)
-      | _ ->
-        let v2 = eval e2 env (fun x -> x) in
-        if v1 = v2 then Some (body, env) else findMatch cases)
+       | Cons (Var h, Empty) ->
+         (match v1 with
+          | ListVal [ hv ] ->
+            let env = ext env h hv in
+            Some (body, env)
+          | _ -> findMatch cases)
+       | Cons (Var h, Var tl) ->
+         (match v1 with
+          | ListVal (hv :: tlv) ->
+            let env = ext env h hv in
+            let env = ext env tl (ListVal tlv) in
+            Some (body, env)
+          | _ -> findMatch cases)
+       | Var x ->
+         let env = ext env x v1 in
+         Some (body, env)
+       | _ ->
+         let v2 = eval e2 env (fun x -> x) in
+         if v1 = v2 then Some (body, env) else findMatch cases)
   in
   match findMatch cases with
   | None -> failwith "match: failed"
